@@ -21,6 +21,23 @@ export interface ProblemFile {
   starterCode: string;
 }
 
+/** One step of graded help. Ordered; revealed one at a time. */
+export interface ProblemHint {
+  /** Stable within the problem — practice records store these ids. */
+  id: string;
+  content: string;
+}
+
+/**
+ * A clean reference implementation, keyed by the same file ids as `files[]`.
+ *
+ * Keyed rather than a single string so multi-file problems can show a complete
+ * worked answer, not just their entry file.
+ */
+export interface ProblemSolution {
+  files: Record<string, string>;
+}
+
 export interface Problem {
   id: string;
   title: string;
@@ -43,4 +60,8 @@ export interface Problem {
    * playground: the workspace simply offers no way to run tests.
    */
   tests?: TestSuite;
+  /** Progressive help, in order. Absent or empty means no hints are offered. */
+  hints?: ProblemHint[];
+  /** The textbook answer, shown read-only and never written into the editor. */
+  solution?: ProblemSolution;
 }

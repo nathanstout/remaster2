@@ -58,6 +58,36 @@ await waitFor(() => button.textContent.includes('3'), {
   ],
 };
 
+const hints = [
+  {
+    id: 'state-not-variable',
+    content:
+      'A plain variable would not survive a re-render, and changing it would not trigger one. `useState` gives you a value plus a setter that asks React to render again.',
+  },
+  {
+    id: 'wire-the-handler',
+    content:
+      'Read the count into the button\'s text, and give the button an `onClick` that calls the setter with the next value.',
+  },
+];
+
+const solution = {
+  files: {
+    'App.tsx': `import { useState } from 'react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <button onClick={() => setCount(count + 1)}>
+      Count: {count}
+    </button>
+  );
+}
+`,
+  },
+};
+
 export const counterProblem: Problem = {
   id: 'counter',
   version: 1,
@@ -70,6 +100,8 @@ export const counterProblem: Problem = {
     'Anything you `console.log` from module scope, from render, or from an event handler shows up in the console below.',
   ].join('\n\n'),
   tests,
+  hints,
+  solution,
   files: [
     {
       id: 'App.tsx',

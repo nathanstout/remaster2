@@ -104,6 +104,38 @@ assert.equal(count, 2);`,
   ],
 };
 
+const hints = [
+  {
+    id: 'delay-until-quiet',
+    content:
+      'The wrapper should not call `fn` straight away. It should wait, and only let the call through once the calls stop arriving for `delay` milliseconds.',
+  },
+  {
+    id: 'cancel-previous',
+    content:
+      'Each new call needs to cancel the one that was already scheduled. `setTimeout` returns an id, and `clearTimeout` takes it.',
+  },
+  {
+    id: 'closure-timer',
+    content:
+      'Keep the pending timer id in the closure that `debounce` returns, so every call sees the same variable. Call `clearTimeout(timer)` first, then `timer = setTimeout(...)`, forwarding the newest arguments and `this` with `fn.apply(this, args)`.',
+  },
+];
+
+const solution = {
+  files: {
+    'solution.js': `function debounce(fn, delay) {
+  let timer;
+
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+`,
+  },
+};
+
 export const debounceProblem: Problem = {
   id: 'debounce',
   version: 1,
@@ -116,6 +148,8 @@ export const debounceProblem: Problem = {
     'The runner below fires a burst of calls and reports how many times `fn` actually ran. The starter implementation is not debounced at all, so it runs five times — fix it so the counts match the expected values.',
   ].join('\n\n'),
   tests,
+  hints,
+  solution,
   files: [
     {
       id: 'solution.js',

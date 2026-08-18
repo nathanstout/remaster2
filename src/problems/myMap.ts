@@ -71,6 +71,42 @@ assert.deepEqual(result, [3, 6]);`,
   ],
 };
 
+const hints = [
+  {
+    id: 'this-is-the-array',
+    content:
+      'Inside a method on `Array.prototype`, `this` is the array the method was called on. Read its `length` and its indexes from there.',
+  },
+  {
+    id: 'build-a-new-array',
+    content:
+      'Never write into `this`. Build a separate array and return it, so the original stays exactly as it was.',
+  },
+  {
+    id: 'callback-signature',
+    content:
+      'Call the callback as `callback.call(thisArg, this[i], i, this)` — value, index and the array itself, with `thisArg` as `this`.',
+  },
+];
+
+const solution = {
+  files: {
+    'solution.js': `Array.prototype.myMap = function (callback, thisArg) {
+  const result = [];
+
+  for (let index = 0; index < this.length; index += 1) {
+    // Skip holes, exactly as the built-in map does, but keep the slot.
+    if (index in this) {
+      result[index] = callback.call(thisArg, this[index], index, this);
+    }
+  }
+
+  return result;
+};
+`,
+  },
+};
+
 export const myMapProblem: Problem = {
   id: 'my-map',
   version: 1,
@@ -83,6 +119,8 @@ export const myMapProblem: Problem = {
     'The runner below prints each result next to the value the real `map` would produce.',
   ].join('\n\n'),
   tests,
+  hints,
+  solution,
   files: [
     {
       id: 'solution.js',

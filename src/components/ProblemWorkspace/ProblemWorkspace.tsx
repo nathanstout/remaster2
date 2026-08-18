@@ -1,43 +1,78 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AssistancePanel } from '../AssistancePanel/AssistancePanel';
 import { AttemptActions } from '../AttemptActions/AttemptActions';
 import { CodeEditor } from '../CodeEditor/CodeEditor';
 import { OutputPane } from '../OutputPane/OutputPane';
 import { FileTabs } from '../FileTabs/FileTabs';
 import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
+import { SolutionViewer } from '../SolutionViewer/SolutionViewer';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import { useRuntime } from '../../hooks/useRuntime';
-import { deleteDraft, loadDraft, saveDraft } from '../../persistence/drafts';
+import { useRuntime, type EvaluationSummary } from '../../hooks/useRuntime';
+import { deleteAttempt, emptyProgress, loadAttempt, saveAttempt } from '../../persistence/attempts';
+import { appendRecord } from '../../persistence/history';
+import { calculateMastery } from '../../practice/scoring';
 import { matchesStarter, starterFiles } from '../../problems';
 import { supportsPreview } from '../../runtime/createRuntime';
+import type { AttemptProgress, PracticeOutcome, PracticeRecord } from '../../types/practice';
 import type { Problem } from '../../types/problem';
 
 /** How long the user has to stop typing before we re-execute. */
 const EDIT_DEBOUNCE_MS = 400;
 
+/** Distinguishes a practice test run from the one that ends the session. */
+type EvaluationMode = 'practice' | 'submit';
+
+function newRecordId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `record-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * Wires the layers together for one problem:
  *   problem -> editor(s) -> (debounce) -> runtime -> console (+ preview)
+ * and owns the practice session running on top of them.
  *
- * Mounted with `key={problem.id}`, so selecting another problem replaces this
- * subtree outright: editable sources are reseeded from the problem definition,
- * console state is dropped, Monaco models are disposed, and `useRuntime`'s
- * cleanup disposes the runtime — terminating its Worker or iframe.
+ * Mounted with a key that changes per problem and per attempt, so ending a
+ * session replaces this subtree outright: sources reseed from the problem
+ * definition, console state is dropped, Monaco models are disposed, and
+ * `useRuntime`'s cleanup disposes the runtime.
  */
 export function ProblemWorkspace({
   problem,
   onAttemptEnded,
 }: {
   problem: Problem;
-  /** Asks the parent to remount this workspace with a clean slate. */
-  onAttemptEnded: () => void;
+  /**
+   * Asks the parent for a clean workspace. A record is passed when a practice
+   * session was actually recorded; resetting passes nothing, because nothing
+   * was practised.
+   */
+  onAttemptEnded: (record?: PracticeRecord) => void;
 }) {
-  // One entry per file: a resumable draft if one was saved, otherwise the
-  // starter. Resolving it in the initializer — before the first render — is
-  // what stops a restored attempt from flashing starter code on the way in.
+  // Source and progress are resolved together, before the first render, so a
+  // resumed attempt never flashes starter code or forgets what it has cost.
+  const restored = useMemo(() => loadAttempt(problem), [problem]);
   const [contents, setContents] = useState<Record<string, string>>(
-    () => loadDraft(problem) ?? starterFiles(problem),
+    () => restored?.files ?? starterFiles(problem),
   );
+  const [progress, setProgress] = useState<AttemptProgress>(() =>
+    restored
+      ? {
+          startedAt: restored.startedAt,
+          revealedHintIds: restored.revealedHintIds,
+          solutionRevealed: restored.solutionRevealed,
+          testRuns: restored.testRuns,
+          failedTestRuns: restored.failedTestRuns,
+        }
+      : emptyProgress(),
+  );
+
   const [activeFileId, setActiveFileId] = useState(problem.files[0].id);
+  const [showSolution, setShowSolution] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [recordError, setRecordError] = useState<string | null>(null);
 
   const debouncedContents = useDebouncedValue(contents, EDIT_DEBOUNCE_MS);
   const {
@@ -54,10 +89,7 @@ export function ProblemWorkspace({
   const hasPreview = supportsPreview(problem);
 
   const activeFile = problem.files.find((file) => file.id === activeFileId) ?? problem.files[0];
-  const modelPath = useCallback(
-    (fileId: string) => `file:///${problem.id}/${fileId}`,
-    [problem.id],
-  );
+  const modelPath = useCallback((fileId: string) => `file:///${problem.id}/${fileId}`, [problem.id]);
   const ownedPaths = useMemo(
     () => problem.files.map((file) => modelPath(file.id)),
     [problem.files, modelPath],
@@ -68,6 +100,29 @@ export function ProblemWorkspace({
     () => ({ files: debouncedContents, entry: problem.files[0].id }),
     [debouncedContents, problem.files],
   );
+
+  /**
+   * Any meaningful practice activity, not just edited source.
+   *
+   * Revealing a hint or running tests costs something, so returning the code to
+   * the starter must not erase the fact that it happened.
+   */
+  const sourceChanged = !matchesStarter(problem, contents);
+  const hasAttempt =
+    sourceChanged ||
+    progress.revealedHintIds.length > 0 ||
+    progress.solutionRevealed ||
+    progress.testRuns > 0;
+
+  // Saving rides the same settle as execution, and covers progress too, so a
+  // revealed hint survives a reload even if the source never changed.
+  useEffect(() => {
+    if (!hasAttempt) {
+      deleteAttempt(problem.id);
+      return;
+    }
+    saveAttempt(problem, debouncedContents, progress);
+  }, [problem, debouncedContents, progress, hasAttempt]);
 
   const updateActiveFile = useCallback(
     (next: string) => {
@@ -82,43 +137,120 @@ export function ProblemWorkspace({
     [activeFile.id, clearEvaluation],
   );
 
-  // Derived, not stored: an attempt exists exactly when the source differs from
-  // the starter, which is also precisely when a draft should be on disk.
-  const hasAttempt = !matchesStarter(problem, contents);
+  const revealHint = useCallback((hintId: string) => {
+    setProgress((previous) =>
+      previous.revealedHintIds.includes(hintId)
+        ? previous
+        : { ...previous, revealedHintIds: [...previous.revealedHintIds, hintId] },
+    );
+  }, []);
 
-  // Saving rides the same settle as execution. Editing back to the starter
-  // removes the draft, so merely opening a problem never leaves one behind.
-  useEffect(() => {
-    if (matchesStarter(problem, debouncedContents)) deleteDraft(problem.id);
-    else saveDraft(problem, debouncedContents);
-  }, [problem, debouncedContents]);
-
-  /**
-   * Throw away the current work and start this problem again. Deliberately
-   * separate from finishing: it records nothing, because nothing was practised.
-   */
-  const handleReset = useCallback(() => {
-    deleteDraft(problem.id);
-    onAttemptEnded();
-  }, [problem.id, onAttemptEnded]);
+  const revealSolution = useCallback(() => {
+    setProgress((previous) => ({ ...previous, solutionRevealed: true }));
+    setShowSolution(true);
+  }, []);
 
   /**
-   * End the practice session. Passing the tests is not required — this says
-   * "I am done for now", not "I was correct". Phase 8 will additionally record
-   * a practice entry here; resetting will still record nothing.
+   * Writes the session to history, then ends it.
+   *
+   * Ordered deliberately: if the record cannot be stored, the attempt is left
+   * completely intact and the failure is surfaced, rather than the work being
+   * destroyed on the strength of a save that never happened.
    */
-  const handleFinish = useCallback(() => {
-    deleteDraft(problem.id);
-    onAttemptEnded();
-  }, [problem.id, onAttemptEnded]);
+  const finalize = useCallback(
+    (
+      outcome: PracticeOutcome,
+      finalTests: { passed: number; total: number },
+      /**
+       * The session as of this moment. Passed explicitly because a submission
+       * finalizes in the same tick that counts its own test run, and reading
+       * `progress` from state here would record the value from before it.
+       */
+      snapshot: AttemptProgress = progress,
+    ): boolean => {
+      const record: PracticeRecord = {
+        id: newRecordId(),
+        problemId: problem.id,
+        startedAt: snapshot.startedAt,
+        completedAt: new Date().toISOString(),
+        outcome,
+        masteryScore: calculateMastery({
+          outcome,
+          totalHints: problem.hints?.length ?? 0,
+          revealedHintCount: snapshot.revealedHintIds.length,
+          solutionRevealed: snapshot.solutionRevealed,
+        }),
+        revealedHintIds: [...snapshot.revealedHintIds],
+        solutionRevealed: snapshot.solutionRevealed,
+        testRuns: snapshot.testRuns,
+        failedTestRuns: snapshot.failedTestRuns,
+        finalTestsPassed: finalTests.passed,
+        finalTestsTotal: finalTests.total,
+      };
+
+      if (!appendRecord(record)) {
+        setRecordError('Could not save this practice session. Your attempt is untouched.');
+        return false;
+      }
+
+      deleteAttempt(problem.id);
+      onAttemptEnded(record);
+      return true;
+    },
+    [problem, progress, onAttemptEnded],
+  );
 
   const suite = problem.tests;
-  const handleRunTests = useCallback(() => {
-    if (!suite) return;
-    // Deliberately `contents`, not the debounced copy: pressing Run Tests
-    // immediately after typing must check what is on screen right now.
-    runTests({ files: contents, entry: problem.files[0].id }, suite);
-  }, [runTests, suite, contents, problem.files]);
+  /** Guards against a second Submit landing while the first is still settling. */
+  const submitInFlight = useRef(false);
+
+  const evaluate = useCallback(
+    (mode: EvaluationMode) => {
+      if (!suite) return;
+      if (mode === 'submit') {
+        if (submitInFlight.current) return;
+        submitInFlight.current = true;
+        setSubmitting(true);
+        setRecordError(null);
+      }
+
+      const onComplete = (summary: EvaluationSummary): void => {
+        // Both kinds of run are test executions during this attempt, so both
+        // count. Only a run that had failures counts as a failed run.
+        const counted: AttemptProgress = {
+          ...progress,
+          testRuns: progress.testRuns + 1,
+          failedTestRuns: progress.failedTestRuns + (summary.failed > 0 ? 1 : 0),
+        };
+        setProgress(counted);
+
+        if (mode !== 'submit') return;
+
+        // A failed submission is just a test run: the attempt stays open.
+        if (summary.failed === 0 && summary.total > 0) {
+          finalize('solved', { passed: summary.passed, total: summary.total }, counted);
+        }
+        submitInFlight.current = false;
+        setSubmitting(false);
+      };
+
+      // Deliberately `contents`, not the debounced copy: submitting right after
+      // typing must evaluate what is on screen right now.
+      runTests({ files: contents, entry: problem.files[0].id }, suite, { onComplete });
+    },
+    [runTests, suite, contents, problem.files, finalize, progress],
+  );
+
+  const handleReset = useCallback(() => {
+    // Records nothing: this is starting over, not a finished practice session.
+    deleteAttempt(problem.id);
+    onAttemptEnded();
+  }, [problem.id, onAttemptEnded]);
+
+  const handleFinishWithoutSolving = useCallback(() => {
+    setRecordError(null);
+    finalize('gave-up', { passed: 0, total: suite?.cases.length ?? 0 });
+  }, [finalize, suite]);
 
   // Runs on mount and after every settled edit — but not on tab switches, which
   // change no source. The runtime disposes the previous execution and starts a
@@ -132,18 +264,37 @@ export function ProblemWorkspace({
       <ProblemPanel
         problem={problem}
         actions={
-          <AttemptActions hasAttempt={hasAttempt} onFinish={handleFinish} onReset={handleReset} />
+          <AttemptActions
+            hasAttempt={hasAttempt}
+            busy={submitting}
+            error={recordError}
+            onSubmit={suite && canEvaluate ? () => evaluate('submit') : undefined}
+            onFinishWithoutSolving={handleFinishWithoutSolving}
+            onReset={handleReset}
+          />
         }
       />
+
+      {/* Its own row, outside the scrollable description: the reveal controls
+          must always be reachable without hunting for them. */}
+      <AssistancePanel
+        problem={problem}
+        revealedHintIds={progress.revealedHintIds}
+        solutionRevealed={progress.solutionRevealed}
+        busy={submitting}
+        onRevealHint={revealHint}
+        onRevealSolution={revealSolution}
+        onOpenSolution={() => setShowSolution(true)}
+      />
+
+      {showSolution && problem.solution && (
+        <SolutionViewer problem={problem} onClose={() => setShowSolution(false)} />
+      )}
 
       <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
         <section className="editor-pane">
           {problem.files.length > 1 ? (
-            <FileTabs
-              files={problem.files}
-              activeFileId={activeFile.id}
-              onSelect={setActiveFileId}
-            />
+            <FileTabs files={problem.files} activeFileId={activeFile.id} onSelect={setActiveFileId} />
           ) : (
             <header className="pane-header">
               <span>{activeFile.name}</span>
@@ -179,7 +330,7 @@ export function ProblemWorkspace({
           entries={entries}
           status={status}
           evaluation={evaluation}
-          onRunTests={suite && canEvaluate ? handleRunTests : undefined}
+          onRunTests={suite && canEvaluate ? () => evaluate('practice') : undefined}
         />
       </main>
     </div>

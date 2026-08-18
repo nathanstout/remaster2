@@ -84,6 +84,46 @@ assert.deepEqual(result, { tags: ['a', 'b'], meta: null, 'user.id': 1 });`,
   ],
 };
 
+const hints = [
+  {
+    id: 'recursion-shape',
+    content:
+      'Walk the entries of the object. A leaf value gets written to the result; a nested plain object needs the same treatment applied one level deeper.',
+  },
+  {
+    id: 'carry-the-prefix',
+    content:
+      'Pass the key path built so far into the recursive call, joining with a dot. The top-level call starts with an empty prefix.',
+  },
+  {
+    id: 'what-counts-as-nested',
+    content:
+      'Only descend into plain objects. `typeof value === "object"` is true for `null` and arrays too, so exclude both — they are leaf values here.',
+  },
+];
+
+const solution = {
+  files: {
+    'solution.js': `function flattenObject(object, prefix = '') {
+  const result = {};
+
+  for (const [key, value] of Object.entries(object)) {
+    const path = prefix ? prefix + '.' + key : key;
+    const isPlainObject = value !== null && typeof value === 'object' && !Array.isArray(value);
+
+    if (isPlainObject) {
+      Object.assign(result, flattenObject(value, path));
+    } else {
+      result[path] = value;
+    }
+  }
+
+  return result;
+}
+`,
+  },
+};
+
 export const flattenObjectProblem: Problem = {
   id: 'flatten-object',
   version: 1,
@@ -96,6 +136,8 @@ export const flattenObjectProblem: Problem = {
     'Decide for yourself what an empty nested object should do — the runner prints that case so you can see the effect of your choice.',
   ].join('\n\n'),
   tests,
+  hints,
+  solution,
   files: [
     {
       id: 'solution.js',

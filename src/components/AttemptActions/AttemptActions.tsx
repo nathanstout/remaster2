@@ -1,27 +1,41 @@
 import { useState } from 'react';
 
 interface AttemptActionsProps {
-  /** False while the files are still untouched starter code. */
+  /** False while nothing meaningful has happened in this session yet. */
   hasAttempt: boolean;
-  onFinish: () => void;
+  /** True while a submission is being evaluated and finalized. */
+  busy: boolean;
+  /** Absent when the problem has no test suite to submit against. */
+  onSubmit?: () => void;
+  onFinishWithoutSolving: () => void;
   onReset: () => void;
+  /** Shown when a practice record could not be written. */
+  error?: string | null;
 }
 
 /**
- * The two ways an attempt ends.
+ * The three ways a session can end.
  *
- * They are deliberately distinct actions rather than one button with a mode:
- * "reset" means start this problem over, "finish" means this practice session
- * is done. Today both simply drop the saved draft, but only finishing will
- * later record that the problem was practised.
+ * They stay distinct because they mean different things: submitting claims the
+ * problem was solved, finishing without solving records that it was not, and
+ * resetting records nothing at all — it simply starts the problem over.
  */
-export function AttemptActions({ hasAttempt, onFinish, onReset }: AttemptActionsProps) {
+export function AttemptActions({
+  hasAttempt,
+  busy,
+  onSubmit,
+  onFinishWithoutSolving,
+  onReset,
+  error,
+}: AttemptActionsProps) {
   const [confirmingReset, setConfirmingReset] = useState(false);
 
   if (confirmingReset) {
     return (
       <div className="attempt-actions confirming">
-        <span className="confirm-prompt">Discard your code and restore the starter?</span>
+        <span className="confirm-prompt">
+          Discard your code and restore the starter? Nothing will be recorded.
+        </span>
         <button type="button" onClick={() => setConfirmingReset(false)}>
           Cancel
         </button>
@@ -41,15 +55,22 @@ export function AttemptActions({ hasAttempt, onFinish, onReset }: AttemptActions
 
   return (
     <div className="attempt-actions">
-      {/* Derived from the source, not from storage: it marks that an attempt is
+      {error && <span className="attempt-error">{error}</span>}
+      {/* Derived from the session, not from storage: it marks that an attempt is
           in progress, and so never claims a save that may have failed. */}
       {hasAttempt && <span className="draft-badge">Draft</span>}
-      <button type="button" onClick={() => setConfirmingReset(true)} disabled={!hasAttempt}>
+
+      <button type="button" onClick={() => setConfirmingReset(true)} disabled={!hasAttempt || busy}>
         Reset Attempt
       </button>
-      <button type="button" onClick={onFinish} disabled={!hasAttempt}>
-        Finish Attempt
+      <button type="button" onClick={onFinishWithoutSolving} disabled={!hasAttempt || busy}>
+        Finish Without Solving
       </button>
+      {onSubmit && (
+        <button type="button" className="submit" onClick={onSubmit} disabled={busy}>
+          {busy ? 'Submitting…' : 'Submit'}
+        </button>
+      )}
     </div>
   );
 }

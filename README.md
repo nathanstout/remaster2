@@ -212,10 +212,48 @@ no parallel selection state, so reloads, deep links and browser Back/Forward all
 stay consistent, and the tree highlight and ancestor expansion follow from the
 route.
 
+## Practice sessions
+
+A problem may carry ordered `hints` and a `solution` keyed by the same file ids
+as `files[]`, so multi-file problems get a complete worked answer. Hints reveal
+one at a time with no friction — the cost is recorded, not negotiated — while
+the full solution confirms first, because it weighs far more heavily. Revealing
+the solution never writes into the editor: it opens read-only alongside it.
+
+`Run Tests` stays a low-pressure development tool. `Submit` evaluates the same
+way but, on a fully passing run, ends the session: it scores the attempt, writes
+a `PracticeRecord`, and only then deletes the attempt — a storage failure leaves
+the work completely intact rather than reporting a save that never happened.
+`Finish Without Solving` records the session as `gave-up`; `Reset Attempt`
+records nothing at all, because nothing was practised.
+
+Mastery is a pure function of outcome and assistance:
+
+| Situation | Mastery |
+| --- | --- |
+| Finished without solving | 1 |
+| Solved after revealing the solution | 1 |
+| Solved with no hints | 5 |
+| Solved, hints ≤ 1/3 | 4 |
+| Solved, hints ≤ 2/3 | 3 |
+| Solved, hints > 2/3 | 2 |
+
+Failed test runs are recorded but deliberately excluded from the score:
+penalising them would push people to test less.
+
+History lives at `practice-app:history` and is append-only — the sequence is the
+point, since later phases derive health from how mastery moves over time.
+Records reference only `problemId`, so moving a problem between folders leaves
+them untouched.
+
 ## Attempts
 
 An unfinished attempt is saved automatically to `localStorage` under
-`practice-app:draft:<problemId>` and restored when the problem is reopened. The
+`practice-app:draft:<problemId>` — the same key as Phase 6, so existing work
+survived the upgrade — and restored when the problem is reopened. It now carries
+the whole session: source, `startedAt`, revealed hints, whether the solution was
+consulted, and test-run counters. An attempt therefore exists as soon as *any*
+meaningful activity happens, not only when source differs from the starter. The
 draft is resolved in the workspace's state initializer, before the first render,
 so a restored attempt never flashes starter code on the way in.
 

@@ -30,6 +30,21 @@ export type RunStatus = 'idle' | 'running' | 'finished' | 'timeout' | 'error';
 
 export type EvaluationStatus = 'idle' | 'running' | 'complete';
 
+export interface EvaluationSummary {
+  passed: number;
+  failed: number;
+  total: number;
+}
+
+export interface RunTestsOptions {
+  /**
+   * Called once when a run finishes on its own. Not called for a run that was
+   * cancelled or superseded, so callers can safely treat it as "this exact run
+   * produced this exact outcome".
+   */
+  onComplete?: (summary: EvaluationSummary) => void;
+}
+
 export interface EvaluationState {
   status: EvaluationStatus;
   results: TestResult[];
@@ -57,7 +72,7 @@ export interface RuntimeController {
   /** Whether this problem's runtime can check a solution at all. */
   canEvaluate: boolean;
   evaluation: EvaluationState;
-  runTests: (source: RuntimeSource, suite: TestSuite) => void;
+  runTests: (source: RuntimeSource, suite: TestSuite, options?: RunTestsOptions) => void;
   /** Cancels any in-flight evaluation and drops results that are now stale. */
   clearEvaluation: () => void;
 }
@@ -161,7 +176,7 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
     else runtime.unmount();
   }, []);
 
-  const runTests = useCallback((source: RuntimeSource, suite: TestSuite) => {
+  const runTests = useCallback((source: RuntimeSource, suite: TestSuite, options?: RunTestsOptions) => {
     const runtime = runtimeRef.current;
     if (!runtime || !isEvaluatableRuntime(runtime)) return;
 
@@ -180,6 +195,11 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
           break;
         case 'evaluation-complete':
           setEvaluation((prev) => ({ ...prev, status: 'complete' }));
+          options?.onComplete?.({
+            passed: event.passed,
+            failed: event.failed,
+            total: event.total,
+          });
           break;
         case 'evaluation-cancelled':
           setEvaluation(IDLE_EVALUATION);

@@ -93,6 +93,74 @@ await waitFor(() => count.textContent.trim() === '2', {
   ],
 };
 
+const hints = [
+  {
+    id: 'which-event',
+    content:
+      'The `input` event fires on every keystroke, paste and deletion. `change` only fires when the field loses focus, which is too late here.',
+  },
+  {
+    id: 'read-and-write',
+    content:
+      'The current text is `textarea.value`, and its length is what you want to display. Write it into the `#count` element with `textContent`.',
+  },
+  {
+    id: 'put-it-together',
+    content:
+      'Add one listener: `textarea.addEventListener("input", () => { count.textContent = textarea.value.length; })`.',
+  },
+];
+
+const solution = {
+  files: {
+    'index.html': `<div class="character-counter">
+  <label for="message">Message</label>
+  <textarea id="message" rows="4" placeholder="Start typing\u2026"></textarea>
+
+  <p class="status">
+    <span id="count">0</span> characters
+  </p>
+</div>
+`,
+    'styles.css': `.character-counter {
+  max-width: 32rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+label {
+  font-weight: 600;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #c9ced8;
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
+}
+
+.status {
+  margin: 0;
+  color: #6b7280;
+}
+
+#count {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+`,
+    'script.js': `const textarea = document.querySelector('#message');
+const count = document.querySelector('#count');
+
+textarea.addEventListener('input', () => {
+  count.textContent = textarea.value.length;
+});
+`,
+  },
+};
+
 export const characterCounterProblem: Problem = {
   id: 'character-counter',
   version: 1,
@@ -105,6 +173,8 @@ export const characterCounterProblem: Problem = {
     'The styling in `styles.css` is a starting point; change whatever you like. Every edit rebuilds the preview from scratch.',
   ].join('\n\n'),
   tests,
+  hints,
+  solution,
   files: [
     { id: 'index.html', name: 'index.html', language: 'html', starterCode: html },
     { id: 'styles.css', name: 'styles.css', language: 'css', starterCode: css },
