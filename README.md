@@ -155,6 +155,30 @@ The runtime mounts the user's default export itself — problems never call
 with the same module the Worker runtime uses, and are validated by source
 window, channel tag and run id before reaching the console.
 
+## Evaluation
+
+Problems may carry `tests?: TestSuite` — plain data, like everything else in the
+catalogue. `Run Tests` checks the **current editor contents**, not the debounced
+copy, so pressing it right after typing checks what is on screen.
+
+Evaluation is an optional runtime capability (`EvaluatableRuntime`), alongside
+`PreviewRuntime`; the base `Runtime` is still two methods wide. Results travel on
+their own `EvaluationEvent` channel rather than through `RuntimeEvent`, which is
+what makes it structurally impossible for a test run to clear the console, spend
+its 500-entry budget, or move the playground's run status.
+
+Every case gets a fresh environment — a new Worker for JavaScript, a new hidden
+off-screen iframe for React and web — so no test can observe state left by
+another, and the visible preview is never touched. JavaScript tests share one
+lexical scope with the solution (the test body sits in a nested block, so it
+shadows rather than collides), which is why `debounce(...)` is directly callable
+without exports. Test source reaches iframes through the same `toScriptString`
+hardening as user source, so no `'unsafe-eval'` is needed in the preview CSP.
+
+Tests get a tiny API: `assert.ok/equal/deepEqual/includes`, `sleep`, `waitFor`.
+Each case has its own timeout (2s default), and a hang fails only that case.
+Editing clears results and cancels any run in flight; so does switching problems.
+
 ## Editing
 
 Workspace state is `Record<fileId, string>`, seeded from the problem definition

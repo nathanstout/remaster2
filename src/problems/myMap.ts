@@ -1,3 +1,4 @@
+import type { TestSuite } from '../types/evaluation';
 import type { Problem } from '../types/problem';
 
 const starterCode = `/**
@@ -33,6 +34,43 @@ const sparse = [1, , 3];
 console.log('sparse:', sparse.myMap((n) => n * 10));
 `;
 
+const tests: TestSuite = {
+  cases: [
+    {
+      id: 'transforms-values',
+      name: 'Transforms every value',
+      source: `assert.deepEqual([1, 2, 3].myMap((x) => x * 2), [2, 4, 6]);`,
+    },
+    {
+      id: 'callback-arguments',
+      name: 'Passes value, index and array to the callback',
+      source: `const calls = [];
+const input = ['a', 'b'];
+input.myMap((value, index, array) => { calls.push([value, index, array === input]); });
+
+assert.deepEqual(calls, [['a', 0, true], ['b', 1, true]]);`,
+    },
+    {
+      id: 'returns-new-array',
+      name: 'Returns a new array and leaves the original alone',
+      source: `const input = [1, 2, 3];
+const result = input.myMap((x) => x * 10);
+
+assert.deepEqual(input, [1, 2, 3], 'the original array was modified');
+assert.ok(result !== input, 'myMap returned the same array instead of a new one');
+assert.deepEqual(result, [10, 20, 30]);`,
+    },
+    {
+      id: 'respects-this-arg',
+      name: 'Uses thisArg as `this` inside the callback',
+      source: `const context = { factor: 3 };
+const result = [1, 2].myMap(function (value) { return value * this.factor; }, context);
+
+assert.deepEqual(result, [3, 6]);`,
+    },
+  ],
+};
+
 export const myMapProblem: Problem = {
   id: 'my-map',
   title: 'Implement myMap',
@@ -43,6 +81,7 @@ export const myMapProblem: Problem = {
     'The callback is invoked with three arguments: the current value, its index, and the array being traversed. If `thisArg` is provided, it becomes `this` inside the callback.',
     'The runner below prints each result next to the value the real `map` would produce.',
   ].join('\n\n'),
+  tests,
   files: [
     {
       id: 'solution.js',

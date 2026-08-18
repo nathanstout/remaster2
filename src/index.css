@@ -256,6 +256,126 @@ body {
 
 /* -------------------------------------------------------------- console */
 
+/* ------------------------------------------------------- output pane */
+
+.output-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.output-tabs button {
+  padding: 2px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.output-tabs button:hover {
+  color: var(--text);
+}
+
+.output-tabs button.selected {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.run-tests {
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #2b303b;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.run-tests:hover:not(:disabled) {
+  background: #343a47;
+  border-color: var(--accent);
+}
+
+.run-tests:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* ------------------------------------------------------ test results */
+
+.test-panel {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 8px 0 12px;
+  font-size: 13px;
+}
+
+.test-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.test-result {
+  padding: 6px 14px;
+  border-bottom: 1px solid #212630;
+}
+
+.test-headline {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.test-mark {
+  font-weight: 700;
+}
+
+.test-passed .test-mark { color: #8fbf7f; }
+.test-failed .test-mark { color: #e06c75; }
+.test-timed-out .test-mark { color: #e5c07b; }
+
+.test-message {
+  margin: 4px 0 0 22px;
+  color: #c9a0a4;
+  white-space: pre-wrap;
+}
+
+.test-comparison {
+  margin: 6px 0 0 22px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.test-comparison dt {
+  color: var(--muted);
+}
+
+.test-comparison dd {
+  margin: 0;
+}
+
+.test-summary {
+  margin: 10px 14px 0;
+  font-weight: 600;
+}
+
+.test-summary.running { color: var(--accent); font-weight: 400; font-style: italic; }
+.test-summary.all-passed { color: #8fbf7f; }
+.test-summary.some-failed { color: #e06c75; }
+
 .console-body {
   flex: 1 1 auto;
   overflow: auto;

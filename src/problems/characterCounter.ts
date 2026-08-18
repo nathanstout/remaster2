@@ -1,3 +1,4 @@
+import type { TestSuite } from '../types/evaluation';
 import type { Problem } from '../types/problem';
 
 const html = `<div class="character-counter">
@@ -49,6 +50,49 @@ const count = document.querySelector('#count');
 console.log('character counter loaded');
 `;
 
+const tests: TestSuite = {
+  cases: [
+    {
+      id: 'starts-at-zero',
+      name: 'Starts at 0 characters',
+      source: `const count = document.querySelector('#count');
+assert.ok(count, 'No #count element was found in the page');
+assert.equal(count.textContent.trim(), '0');`,
+    },
+    {
+      id: 'counts-typed-text',
+      name: 'Updates the count as the user types',
+      source: `const textarea = document.querySelector('#message');
+const count = document.querySelector('#count');
+assert.ok(textarea, 'No #message textarea was found in the page');
+
+textarea.value = 'hello';
+textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+await waitFor(() => count.textContent.trim() === '5', {
+  message: 'The count did not update to 5 after typing "hello"',
+});`,
+    },
+    {
+      id: 'updates-again-on-change',
+      name: 'Keeps the count in sync when the text changes again',
+      source: `const textarea = document.querySelector('#message');
+const count = document.querySelector('#count');
+
+textarea.value = 'hello';
+textarea.dispatchEvent(new Event('input', { bubbles: true }));
+await waitFor(() => count.textContent.trim() === '5');
+
+textarea.value = 'hi';
+textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+await waitFor(() => count.textContent.trim() === '2', {
+  message: 'The count did not fall to 2 after shortening the message',
+});`,
+    },
+  ],
+};
+
 export const characterCounterProblem: Problem = {
   id: 'character-counter',
   title: 'Build a Character Counter',
@@ -59,6 +103,7 @@ export const characterCounterProblem: Problem = {
     '`index.html` holds the body markup only — the preview supplies the surrounding document, so there is no `<html>` or `<head>` to write.',
     'The styling in `styles.css` is a starting point; change whatever you like. Every edit rebuilds the preview from scratch.',
   ].join('\n\n'),
+  tests,
   files: [
     { id: 'index.html', name: 'index.html', language: 'html', starterCode: html },
     { id: 'styles.css', name: 'styles.css', language: 'css', starterCode: css },

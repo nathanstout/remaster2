@@ -1,3 +1,4 @@
+import type { TestSuite } from '../types/evaluation';
 import type { Problem } from '../types/problem';
 
 const starterCode = `/**
@@ -47,6 +48,62 @@ setTimeout(() => {
 }, 600);
 `;
 
+const tests: TestSuite = {
+  cases: [
+    {
+      id: 'collapses-rapid-calls',
+      name: 'Collapses a burst of calls into one',
+      source: `let count = 0;
+const save = debounce(() => { count += 1; }, 30);
+
+save();
+save();
+save();
+
+await sleep(80);
+assert.equal(count, 1);`,
+    },
+    {
+      id: 'uses-latest-arguments',
+      name: 'Calls through with the most recent arguments',
+      source: `let received;
+const save = debounce((value) => { received = value; }, 30);
+
+save('first');
+save('second');
+
+await sleep(80);
+assert.equal(received, 'second');`,
+    },
+    {
+      id: 'waits-for-the-delay',
+      name: 'Waits for the delay before running',
+      source: `let called = false;
+const save = debounce(() => { called = true; }, 60);
+
+save();
+await sleep(20);
+assert.equal(called, false, 'fn ran before the delay had elapsed');
+
+await sleep(80);
+assert.equal(called, true, 'fn never ran after the delay');`,
+    },
+    {
+      id: 'runs-again-after-quiet-period',
+      name: 'Runs again for a later, separate burst',
+      source: `let count = 0;
+const save = debounce(() => { count += 1; }, 30);
+
+save();
+await sleep(80);
+save();
+await sleep(80);
+
+assert.equal(count, 2);`,
+    },
+  ],
+};
+
 export const debounceProblem: Problem = {
   id: 'debounce',
   title: 'Implement debounce',
@@ -57,6 +114,7 @@ export const debounceProblem: Problem = {
     'The wrapper should forward both its arguments and its `this` value to `fn`.',
     'The runner below fires a burst of calls and reports how many times `fn` actually ran. The starter implementation is not debounced at all, so it runs five times — fix it so the counts match the expected values.',
   ].join('\n\n'),
+  tests,
   files: [
     {
       id: 'solution.js',

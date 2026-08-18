@@ -1,6 +1,7 @@
 import {
   buildPreviewDocument,
   escapeForScript,
+  testRunnerScript,
   toScriptString,
 } from '../shared/preview/bridge';
 
@@ -129,5 +130,27 @@ export function buildReactPreviewDocument(input: ReactPreviewDocumentInput): str
     runId: input.runId,
     body: '<div id="root"></div>',
     scripts: [moduleRegistryScript(input.moduleSources), bootstrapScript(input.userCode)],
+  });
+}
+
+/**
+ * The evaluation variant: the same document the user sees, plus one test.
+ *
+ * Identical bootstrap, registry, sandbox and embedding protections — only the
+ * console is silenced and a test runner is appended, so what gets checked is
+ * exactly what the preview would render.
+ */
+export function buildReactEvaluationDocument(
+  input: ReactPreviewDocumentInput & { testSource: string },
+): string {
+  return buildPreviewDocument({
+    runId: input.runId,
+    silentConsole: true,
+    body: '<div id="root"></div>',
+    scripts: [
+      moduleRegistryScript(input.moduleSources),
+      bootstrapScript(input.userCode),
+      testRunnerScript(input.testSource),
+    ],
   });
 }

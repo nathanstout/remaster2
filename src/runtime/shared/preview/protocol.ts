@@ -20,7 +20,18 @@ export type PreviewOutbound =
     }
   | { channel: typeof PREVIEW_CHANNEL; runId: number; type: 'error'; message: string; stack?: string }
   /** Posted once the preview's own bootstrap finished. The frame stays alive. */
-  | { channel: typeof PREVIEW_CHANNEL; runId: number; type: 'ready' };
+  | { channel: typeof PREVIEW_CHANNEL; runId: number; type: 'ready' }
+  /** Only sent by evaluation documents: the outcome of the single test case. */
+  | {
+      channel: typeof PREVIEW_CHANNEL;
+      runId: number;
+      type: 'test';
+      status: 'passed' | 'failed';
+      message?: string;
+      expected?: SerializedValue;
+      actual?: SerializedValue;
+      durationMs?: number;
+    };
 
 export function isPreviewMessage(data: unknown): data is PreviewOutbound {
   if (typeof data !== 'object' || data === null) return false;
@@ -28,6 +39,9 @@ export function isPreviewMessage(data: unknown): data is PreviewOutbound {
   return (
     message.channel === PREVIEW_CHANNEL &&
     typeof message.runId === 'number' &&
-    (message.type === 'console' || message.type === 'error' || message.type === 'ready')
+    (message.type === 'console' ||
+      message.type === 'error' ||
+      message.type === 'ready' ||
+      message.type === 'test')
   );
 }

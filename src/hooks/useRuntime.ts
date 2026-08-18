@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRuntime } from '../runtime/createRuntime';
 import { MAX_CONSOLE_ENTRIES } from '../runtime/shared/consoleLimit';
+import {
+  isEvaluatableRuntime,
+  type EvaluationEvent,
+  type TestResult,
+  type TestSuite,
+} from '../types/evaluation';
 import type { Problem } from '../types/problem';
 import {
   isPreviewRuntime,
@@ -22,6 +28,17 @@ export { MAX_CONSOLE_ENTRIES };
 
 export type RunStatus = 'idle' | 'running' | 'finished' | 'timeout' | 'error';
 
+export type EvaluationStatus = 'idle' | 'running' | 'complete';
+
+export interface EvaluationState {
+  status: EvaluationStatus;
+  results: TestResult[];
+  /** Known once a run starts, so progress can be shown as results arrive. */
+  total: number;
+}
+
+const IDLE_EVALUATION: EvaluationState = { status: 'idle', results: [], total: 0 };
+
 export interface RuntimeController {
   entries: ConsoleEntry[];
   status: RunStatus;
@@ -37,6 +54,12 @@ export interface RuntimeController {
    * without preview capability — it simply never gets used.
    */
   previewRef: (element: HTMLElement | null) => void;
+  /** Whether this problem's runtime can check a solution at all. */
+  canEvaluate: boolean;
+  evaluation: EvaluationState;
+  runTests: (source: RuntimeSource, suite: TestSuite) => void;
+  /** Cancels any in-flight evaluation and drops results that are now stale. */
+  clearEvaluation: () => void;
 }
 
 /**
@@ -47,6 +70,7 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
   const [entries, setEntries] = useState<ConsoleEntry[]>([]);
   const [status, setStatus] = useState<RunStatus>('idle');
   const [generation, setGeneration] = useState(0);
+  const [evaluation, setEvaluation] = useState<EvaluationState>(IDLE_EVALUATION);
   const runtimeRef = useRef<Runtime | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
 
@@ -116,9 +140,14 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
 
     return () => {
       runtimeRef.current = null;
+      // Disposal cancels evaluation too, so switching problems can never leave
+      // a suite running against source that is no longer on screen.
       runtime.dispose();
     };
   }, [problem]);
+
+  // A new problem starts with no results.
+  useEffect(() => setEvaluation(IDLE_EVALUATION), [problem]);
 
   const run = useCallback((source: RuntimeSource) => {
     runtimeRef.current?.run(source);
@@ -132,5 +161,53 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
     else runtime.unmount();
   }, []);
 
-  return { entries, status, run, generation, previewRef };
+  const runTests = useCallback((source: RuntimeSource, suite: TestSuite) => {
+    const runtime = runtimeRef.current;
+    if (!runtime || !isEvaluatableRuntime(runtime)) return;
+
+    // Starting a run supersedes whatever was running before.
+    runtime.cancelEvaluation();
+    setEvaluation({ status: 'running', results: [], total: suite.cases.length });
+
+    const handleEvent = (event: EvaluationEvent): void => {
+      switch (event.type) {
+        case 'evaluation-start':
+          setEvaluation({ status: 'running', results: [], total: event.total });
+          break;
+        case 'test-result':
+          // Results land one at a time, so progress is visible as it happens.
+          setEvaluation((prev) => ({ ...prev, results: [...prev.results, event.result] }));
+          break;
+        case 'evaluation-complete':
+          setEvaluation((prev) => ({ ...prev, status: 'complete' }));
+          break;
+        case 'evaluation-cancelled':
+          setEvaluation(IDLE_EVALUATION);
+          break;
+      }
+    };
+
+    runtime.evaluate(source, suite, handleEvent);
+  }, []);
+
+  const clearEvaluation = useCallback(() => {
+    const runtime = runtimeRef.current;
+    if (runtime && isEvaluatableRuntime(runtime)) runtime.cancelEvaluation();
+    setEvaluation((prev) => (prev === IDLE_EVALUATION ? prev : IDLE_EVALUATION));
+  }, []);
+
+  const canEvaluate =
+    runtimeRef.current !== null && isEvaluatableRuntime(runtimeRef.current) && generation > 0;
+
+  return {
+    entries,
+    status,
+    run,
+    generation,
+    previewRef,
+    canEvaluate,
+    evaluation,
+    runTests,
+    clearEvaluation,
+  };
 }

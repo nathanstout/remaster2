@@ -1,3 +1,5 @@
+import type { TestSuite } from './evaluation';
+
 /**
  * Problem model.
  *
@@ -30,4 +32,9 @@ export interface Problem {
    * problems will hand the whole set to an iframe runtime.
    */
   files: ProblemFile[];
+  /**
+   * Optional checks for the solution. Absent means the problem is a pure
+   * playground: the workspace simply offers no way to run tests.
+   */
+  tests?: TestSuite;
 }

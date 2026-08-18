@@ -1,5 +1,9 @@
 import type { RuntimeSource } from '../../types/runtime';
-import { buildPreviewDocument, toScriptString } from '../shared/preview/bridge';
+import {
+  buildPreviewDocument,
+  testRunnerScript,
+  toScriptString,
+} from '../shared/preview/bridge';
 
 /**
  * Splits a web problem's files into the three preview slots.
@@ -49,7 +53,11 @@ export function splitWebSource(source: RuntimeSource): {
  * recover from malformed markup on their own. Pretending otherwise would
  * misrepresent how the platform behaves.
  */
-export function buildWebPreviewDocument(runId: number, source: RuntimeSource): string {
+export function buildWebPreviewDocument(
+  runId: number,
+  source: RuntimeSource,
+  evaluation?: { testSource: string },
+): string {
   const { html, css, js } = splitWebSource(source);
 
   // In <head>, so styles are applied before the body is parsed — no flash of
@@ -78,10 +86,15 @@ export function buildWebPreviewDocument(runId: number, source: RuntimeSource): s
   // to parse. Without it a syntax error would degrade into a startup timeout.
   const readyScript = `setTimeout(function () { window.__preview.ready(); }, 0);`;
 
+  // Evaluation reuses this document wholesale — same markup, styles, script
+  // injection, escaping, CSP and sandbox — and only appends the test runner.
   return buildPreviewDocument({
     runId,
+    silentConsole: evaluation !== undefined,
     headScripts: [styleScript],
     body: html,
-    scripts: [userScript, readyScript],
+    scripts: evaluation
+      ? [userScript, readyScript, testRunnerScript(evaluation.testSource)]
+      : [userScript, readyScript],
   });
 }

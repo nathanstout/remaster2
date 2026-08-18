@@ -1,3 +1,4 @@
+import type { TestSuite } from '../types/evaluation';
 import type { Problem } from '../types/problem';
 
 const starterCode = `import { useState } from 'react';
@@ -17,6 +18,46 @@ export default function App() {
 }
 `;
 
+const findButton = `await waitFor(() => document.querySelector('button'), {
+  message: 'No button was rendered by your component',
+});
+const button = document.querySelector('button');`;
+
+const tests: TestSuite = {
+  cases: [
+    {
+      id: 'renders-a-button-at-zero',
+      name: 'Renders a button starting at 0',
+      source: `${findButton}
+assert.includes(button.textContent, '0');`,
+    },
+    {
+      id: 'increments-on-click',
+      name: 'Increments when clicked',
+      source: `${findButton}
+button.click();
+
+await waitFor(() => button.textContent.includes('1'), {
+  message: 'The button never showed a count of 1 after one click',
+});`,
+    },
+    {
+      id: 'handles-multiple-clicks',
+      name: 'Keeps counting across several clicks',
+      source: `${findButton}
+button.click();
+await waitFor(() => button.textContent.includes('1'));
+button.click();
+await waitFor(() => button.textContent.includes('2'));
+button.click();
+
+await waitFor(() => button.textContent.includes('3'), {
+  message: 'The button never reached a count of 3 after three clicks',
+});`,
+    },
+  ],
+};
+
 export const counterProblem: Problem = {
   id: 'counter',
   title: 'Build a Counter',
@@ -27,6 +68,7 @@ export const counterProblem: Problem = {
     'The component you export as the default export is what gets rendered in the preview — you do not need to call `createRoot` yourself.',
     'Anything you `console.log` from module scope, from render, or from an event handler shows up in the console below.',
   ].join('\n\n'),
+  tests,
   files: [
     {
       id: 'App.tsx',

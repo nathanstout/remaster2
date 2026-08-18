@@ -1,8 +1,10 @@
 import type {
-  Runtime,
-  RuntimeEventHandler,
-  RuntimeSource,
-} from '../../types/runtime';
+  EvaluatableRuntime,
+  EvaluationEventHandler,
+  TestSuite,
+} from '../../types/evaluation';
+import type { RuntimeEventHandler, RuntimeSource } from '../../types/runtime';
+import { JavaScriptEvaluator } from './JavaScriptEvaluator';
 import type { WorkerInbound, WorkerOutbound } from './protocol';
 
 /** Longest the synchronous body may run before we assume it is stuck. */
@@ -25,14 +27,25 @@ interface Execution {
  * the previous Worker away and builds a new one, which is what guarantees a
  * clean slate — no leftover globals, timers, listeners or module state.
  */
-export class JavaScriptWorkerRuntime implements Runtime {
+export class JavaScriptWorkerRuntime implements EvaluatableRuntime {
   private readonly emit: RuntimeEventHandler;
+  /** Evaluation lives in its own Workers; `run()` below is untouched by it. */
+  private readonly evaluator = new JavaScriptEvaluator();
   private current: Execution | null = null;
   private nextId = 1;
   private disposed = false;
 
   constructor(emit: RuntimeEventHandler) {
     this.emit = emit;
+  }
+
+  evaluate(source: RuntimeSource, suite: TestSuite, emit: EvaluationEventHandler): void {
+    if (this.disposed) return;
+    this.evaluator.evaluate(source, suite, emit);
+  }
+
+  cancelEvaluation(): void {
+    this.evaluator.cancel();
   }
 
   run(source: RuntimeSource): void {
@@ -103,6 +116,7 @@ export class JavaScriptWorkerRuntime implements Runtime {
 
   dispose(): void {
     this.disposed = true;
+    this.evaluator.cancel();
     this.teardown();
   }
 

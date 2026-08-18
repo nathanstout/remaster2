@@ -3,3 +3,9 @@ declare module 'virtual:preview-serializer' {
   const serializerSource: string;
   export default serializerSource;
 }
+
+declare module 'virtual:preview-test-api' {
+  /** IIFE build of `runtime/shared/testing/testApi.ts`, exposing `__previewTestApi`. */
+  const testApiSource: string;
+  export default testApiSource;
+}

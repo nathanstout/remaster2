@@ -14,3 +14,20 @@ export type WorkerOutbound =
   | { type: 'evaluated' }
   /** Everything, including tracked async work, is done. */
   | { type: 'complete' };
+
+/** Main thread -> evaluation Worker. One test per Worker, then terminate. */
+export type EvaluationWorkerInbound = {
+  type: 'run-test';
+  userCode: string;
+  testSource: string;
+};
+
+/** Evaluation Worker -> main thread. */
+export type EvaluationWorkerOutbound = {
+  type: 'result';
+  status: 'passed' | 'failed';
+  message?: string;
+  expected?: SerializedValue;
+  actual?: SerializedValue;
+  durationMs?: number;
+};

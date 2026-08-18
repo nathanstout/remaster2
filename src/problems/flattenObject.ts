@@ -1,3 +1,4 @@
+import type { TestSuite } from '../types/evaluation';
 import type { Problem } from '../types/problem';
 
 const starterCode = `/**
@@ -39,6 +40,50 @@ console.log('expected:', {
 console.log('edge cases:', flattenObject({ tags: ['a', 'b'], meta: null, empty: {} }));
 `;
 
+const tests: TestSuite = {
+  cases: [
+    {
+      id: 'flattens-nested-properties',
+      name: 'Flattens nested properties into dotted keys',
+      source: `const result = flattenObject({
+  user: { name: 'Nathan', address: { city: 'Raleigh' } },
+});
+
+assert.deepEqual(result, {
+  'user.name': 'Nathan',
+  'user.address.city': 'Raleigh',
+});`,
+    },
+    {
+      id: 'handles-multiple-branches',
+      name: 'Handles sibling branches at several depths',
+      source: `const result = flattenObject({
+  a: { b: 1, c: { d: 2, e: 3 } },
+  f: { g: { h: 4 } },
+});
+
+assert.deepEqual(result, {
+  'a.b': 1,
+  'a.c.d': 2,
+  'a.c.e': 3,
+  'f.g.h': 4,
+});`,
+    },
+    {
+      id: 'keeps-flat-objects-unchanged',
+      name: 'Leaves an already-flat object unchanged',
+      source: `assert.deepEqual(flattenObject({ active: true, count: 2 }), { active: true, count: 2 });`,
+    },
+    {
+      id: 'treats-arrays-and-null-as-values',
+      name: 'Treats arrays and null as leaf values',
+      source: `const result = flattenObject({ tags: ['a', 'b'], meta: null, user: { id: 1 } });
+
+assert.deepEqual(result, { tags: ['a', 'b'], meta: null, 'user.id': 1 });`,
+    },
+  ],
+};
+
 export const flattenObjectProblem: Problem = {
   id: 'flatten-object',
   title: 'Flatten a nested object',
@@ -49,6 +94,7 @@ export const flattenObjectProblem: Problem = {
     'Only plain nested objects should be descended into. Treat arrays, `null`, and primitives as leaf values and keep them as-is.',
     'Decide for yourself what an empty nested object should do — the runner prints that case so you can see the effect of your choice.',
   ].join('\n\n'),
+  tests,
   files: [
     {
       id: 'solution.js',

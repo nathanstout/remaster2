@@ -1,4 +1,10 @@
+import type {
+  EvaluatableRuntime,
+  EvaluationEventHandler,
+  TestSuite,
+} from '../../types/evaluation';
 import type { PreviewRuntime, RuntimeEventHandler, RuntimeSource } from '../../types/runtime';
+import { IframeEvaluationHost } from '../shared/preview/IframeEvaluationHost';
 import { IframePreviewHost } from '../shared/preview/IframePreviewHost';
 import { buildWebPreviewDocument } from './previewDocument';
 
@@ -9,8 +15,11 @@ import { buildWebPreviewDocument } from './previewDocument';
  * everything else (run ids, mounting, message routing, watchdog, teardown) is
  * the shared preview host, exactly as for React.
  */
-export class WebPreviewRuntime implements PreviewRuntime {
+export class WebPreviewRuntime implements PreviewRuntime, EvaluatableRuntime {
   private readonly host: IframePreviewHost;
+  private readonly evaluationHost = new IframeEvaluationHost(({ runId, source, testCase }) =>
+    Promise.resolve(buildWebPreviewDocument(runId, source, { testSource: testCase.source })),
+  );
 
   constructor(emit: RuntimeEventHandler) {
     this.host = new IframePreviewHost(emit, {
@@ -32,7 +41,16 @@ export class WebPreviewRuntime implements PreviewRuntime {
     this.host.unmount();
   }
 
+  evaluate(source: RuntimeSource, suite: TestSuite, emit: EvaluationEventHandler): void {
+    this.evaluationHost.evaluate(source, suite, emit);
+  }
+
+  cancelEvaluation(): void {
+    this.evaluationHost.cancel();
+  }
+
   dispose(): void {
+    this.evaluationHost.cancel();
     this.host.dispose();
   }
 }

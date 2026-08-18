@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CodeEditor } from '../CodeEditor/CodeEditor';
-import { Console } from '../Console/Console';
+import { OutputPane } from '../OutputPane/OutputPane';
 import { FileTabs } from '../FileTabs/FileTabs';
 import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
@@ -29,7 +29,17 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const [activeFileId, setActiveFileId] = useState(problem.files[0].id);
 
   const debouncedContents = useDebouncedValue(contents, EDIT_DEBOUNCE_MS);
-  const { entries, status, run, generation, previewRef } = useRuntime(problem);
+  const {
+    entries,
+    status,
+    run,
+    generation,
+    previewRef,
+    canEvaluate,
+    evaluation,
+    runTests,
+    clearEvaluation,
+  } = useRuntime(problem);
   const hasPreview = supportsPreview(problem);
 
   const activeFile = problem.files.find((file) => file.id === activeFileId) ?? problem.files[0];
@@ -50,12 +60,24 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
 
   const updateActiveFile = useCallback(
     (next: string) => {
-      setContents((previous) =>
-        previous[activeFile.id] === next ? previous : { ...previous, [activeFile.id]: next },
-      );
+      setContents((previous) => {
+        if (previous[activeFile.id] === next) return previous;
+        // Results describe source that no longer exists, so they go — along
+        // with any evaluation still running against it.
+        clearEvaluation();
+        return { ...previous, [activeFile.id]: next };
+      });
     },
-    [activeFile.id],
+    [activeFile.id, clearEvaluation],
   );
+
+  const suite = problem.tests;
+  const handleRunTests = useCallback(() => {
+    if (!suite) return;
+    // Deliberately `contents`, not the debounced copy: pressing Run Tests
+    // immediately after typing must check what is on screen right now.
+    runTests({ files: contents, entry: problem.files[0].id }, suite);
+  }, [runTests, suite, contents, problem.files]);
 
   // Runs on mount and after every settled edit — but not on tab switches, which
   // change no source. The runtime disposes the previous execution and starts a
@@ -107,7 +129,12 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
           </section>
         )}
 
-        <Console entries={entries} status={status} />
+        <OutputPane
+          entries={entries}
+          status={status}
+          evaluation={evaluation}
+          onRunTests={suite && canEvaluate ? handleRunTests : undefined}
+        />
       </main>
     </div>
   );

@@ -1,4 +1,5 @@
 import serializerSource from 'virtual:preview-serializer';
+import testApiSource from 'virtual:preview-test-api';
 import { CONSOLE_POST_LIMIT } from '../consoleLimit';
 import { PREVIEW_CHANNEL } from './protocol';
 
@@ -77,7 +78,7 @@ body {
  * uses the same serializer as the Worker runtime so both produce identical
  * console values.
  */
-export function bridgeScript(runId: number): string {
+export function bridgeScript(runId: number, options: { silentConsole?: boolean } = {}): string {
   return `
 (function () {
   var RUN_ID = ${runId};
@@ -153,10 +154,16 @@ ${serializerSource}
     post({ type: "console", level: level, args: args.map(serializeArg) });
   }
 
+  // Evaluation documents drop console output entirely: results travel on their
+  // own channel, and a noisy solution must not be able to drown them out or
+  // spend the playground console's budget.
+  var silent = ${options.silentConsole ? 'true' : 'false'};
+
   var levels = ["log", "info", "warn", "error", "debug"];
   var intercepted = {};
   levels.forEach(function (level) {
     intercepted[level] = function () {
+      if (silent) return;
       postConsole(level, Array.prototype.slice.call(arguments));
     };
   });
@@ -217,8 +224,68 @@ ${serializerSource}
 `;
 }
 
+/**
+ * Runs one test case inside an evaluation document and reports the outcome.
+ *
+ * The test body is injected the same way user source is — as a string attached
+ * to a script element's `textContent` — so a literal `</script>` in a test
+ * cannot corrupt the document, and no `'unsafe-eval'` has to be added to the
+ * preview CSP for a `Function` constructor.
+ */
+export function testRunnerScript(testSource: string): string {
+  return `
+(function () {
+${testApiSource}
+
+  var api = __previewTestApi.createTestApi();
+  var preview = window.__preview;
+  var started = Date.now();
+
+  function report(message) {
+    message.type = "test";
+    message.durationMs = Date.now() - started;
+    preview.post(message);
+  }
+
+  function describeFailure(error) {
+    if (error && error.name === "AssertionError") {
+      return {
+        status: "failed",
+        message: error.message,
+        expected: error.hasComparison ? __previewSerializer.serialize(error.expected) : undefined,
+        actual: error.hasComparison ? __previewSerializer.serialize(error.actual) : undefined
+      };
+    }
+    if (error instanceof Error) {
+      return { status: "failed", message: error.name + ": " + error.message };
+    }
+    return { status: "failed", message: "Test threw " + String(error) };
+  }
+
+  var loader = document.createElement("script");
+  loader.textContent =
+    "window.__runTest = async function (assert, sleep, waitFor) {\\n" +
+    ${JSON.stringify(testSource).replace(/</g, '\\u003c')} +
+    "\\n};";
+  document.body.appendChild(loader);
+
+  if (typeof window.__runTest !== "function") {
+    report({ status: "failed", message: "The test could not be compiled." });
+    return;
+  }
+
+  Promise.resolve()
+    .then(function () { return window.__runTest(api.assert, api.sleep, api.waitFor); })
+    .then(function () { report({ status: "passed" }); })
+    .catch(function (error) { report(describeFailure(error)); });
+})();
+`;
+}
+
 export interface PreviewDocumentParts {
   runId: number;
+  /** Evaluation documents suppress console forwarding. */
+  silentConsole?: boolean;
   /**
    * Scripts run in `<head>`, after the bridge but before body markup is parsed.
    * Anything that must be in place before the user's own markup runs — such as
@@ -245,7 +312,10 @@ export function buildPreviewDocument(parts: PreviewDocumentParts): string {
   // The bridge goes in <head>, ahead of the user's markup. That ordering is
   // what lets it capture output and errors from a `<script>` the user wrote
   // inside their own HTML, which runs while the body is still being parsed.
-  const head = scriptElements([bridgeScript(parts.runId), ...(parts.headScripts ?? [])]);
+  const head = scriptElements([
+    bridgeScript(parts.runId, { silentConsole: parts.silentConsole }),
+    ...(parts.headScripts ?? []),
+  ]);
 
   return `<!doctype html>
 <html lang="en">

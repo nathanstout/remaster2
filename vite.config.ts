@@ -4,38 +4,48 @@ import * as esbuild from 'esbuild-wasm';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const SERIALIZER_ID = 'virtual:preview-serializer';
-const SERIALIZER_PATH = fileURLToPath(new URL('./src/runtime/shared/serialize.ts', import.meta.url));
-
 /**
- * Exposes the shared console serializer as an IIFE *string*.
+ * Modules that preview iframes need as *text*.
  *
- * Preview iframes are opaque-origin and can only receive code inline, so the
- * serializer has to reach them as text. Compiling it here at build time — with
- * the esbuild-wasm the React runtime already depends on, running under Node —
- * keeps `serialize.ts` the single source of truth for both the Worker and the
- * previews, without making a plain HTML/CSS exercise download the 14MB WASM
- * compiler just to format a console line.
+ * An opaque-origin sandbox can only receive code inline, so these are compiled
+ * to IIFEs here at build time — with the esbuild-wasm the React runtime already
+ * depends on, running under Node. That keeps each one a single source of truth
+ * shared by the Worker and the previews, without making a plain HTML/CSS
+ * exercise download the 14MB WASM compiler just to format a console line.
  */
-function previewSerializerPlugin(): Plugin {
-  const resolved = `\0${SERIALIZER_ID}`;
+const INLINE_MODULES: Record<string, { path: string; globalName: string }> = {
+  'virtual:preview-serializer': {
+    path: fileURLToPath(new URL('./src/runtime/shared/serialize.ts', import.meta.url)),
+    globalName: '__previewSerializer',
+  },
+  'virtual:preview-test-api': {
+    path: fileURLToPath(new URL('./src/runtime/shared/testing/testApi.ts', import.meta.url)),
+    globalName: '__previewTestApi',
+  },
+};
+
+function inlineModulesPlugin(): Plugin {
+  const resolvedPrefix = '\0';
 
   return {
-    name: 'preview-serializer',
+    name: 'preview-inline-modules',
     resolveId(id) {
-      return id === SERIALIZER_ID ? resolved : null;
+      return id in INLINE_MODULES ? `${resolvedPrefix}${id}` : null;
     },
     async load(id) {
-      if (id !== resolved) return null;
-      const source = await readFile(SERIALIZER_PATH, 'utf8');
+      if (!id.startsWith(resolvedPrefix)) return null;
+      const entry = INLINE_MODULES[id.slice(resolvedPrefix.length)];
+      if (!entry) return null;
+
+      const source = await readFile(entry.path, 'utf8');
       const built = await esbuild.transform(source, {
         loader: 'ts',
         format: 'iife',
-        globalName: '__previewSerializer',
+        globalName: entry.globalName,
         target: 'es2020',
-        sourcefile: SERIALIZER_PATH,
+        sourcefile: entry.path,
       });
-      this.addWatchFile(SERIALIZER_PATH);
+      this.addWatchFile(entry.path);
       return `export default ${JSON.stringify(built.code)};`;
     },
   };
@@ -43,5 +53,5 @@ function previewSerializerPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), previewSerializerPlugin()],
+  plugins: [react(), inlineModulesPlugin()],
 });
