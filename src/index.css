@@ -25,9 +25,116 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* Three independent scroll regions inside one viewport-height shell, so a long
+   description scrolls its own column instead of pushing the editor down. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
 .app {
   display: flex;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.nav-sidebar {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.nav-rail {
+  flex: 0 0 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 10px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.nav-toggle {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.nav-toggle:hover {
+  color: var(--text);
+  background: #242833;
+}
+
+/* The reference column: fixed, readable width that does not track content. */
+.problem-context {
+  flex: 0 0 340px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.problem-context-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 20px;
+}
+
+.context-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.context-heading h1 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.context-section p {
+  margin: 0 0 10px;
+  color: #c2c8d4;
+}
+
+.context-section code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #262b34;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+}
+
+/* Pinned, so ending a session never means scrolling to find the button. */
+.context-actions {
+  flex: 0 0 auto;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+}
+
+/* Takes whatever width is left. `min-width: 0` is load-bearing: without it the
+   editor and preview keep their content width and overflow the shell. */
+.workspace-area {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .problem-column {
@@ -62,15 +169,12 @@ body {
 }
 
 .assistance {
-  flex: 0 0 auto;
-  max-height: 26vh;
-  overflow-y: auto;
-  padding: 8px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--panel);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
 }
 
@@ -123,9 +227,11 @@ body {
 }
 
 .solution-viewer {
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   max-height: 45vh;
+  min-height: 0;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
@@ -186,10 +292,11 @@ body {
 /* -------------------------------------------------------- problem list */
 
 .problem-list {
-  flex: 0 0 300px;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   border-right: 1px solid var(--border);
   background: var(--panel);
 }
@@ -442,7 +549,13 @@ body {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
+}
+
+.folder-detail > .problem {
+  max-height: none;
+  overflow: visible;
 }
 
 .breadcrumb {
@@ -684,7 +797,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
 }
 
 .attempt-actions button {
@@ -1059,3 +1172,14 @@ body {
 .v-punct { color: var(--muted); }
 .v-meta { color: var(--muted); font-style: italic; }
 .v-error-value { color: #e88b91; }
+
+/* Narrower laptops: give width back to the workspace before anything overflows. */
+@media (max-width: 1400px) {
+  .nav-sidebar { flex-basis: 260px; }
+  .problem-context { flex-basis: 310px; }
+}
+
+@media (max-width: 1180px) {
+  .nav-sidebar { flex-basis: 220px; }
+  .problem-context { flex-basis: 280px; }
+}

@@ -11,6 +11,28 @@ npm run build    # tsc -b && vite build
 npm run lint
 ```
 
+## Desktop layout
+
+Problem routes are three columns, each its own scroll region inside a
+viewport-height shell:
+
+```
+Navigation (300px, collapsible to a 44px rail)
+  │ Problem reference (340px): title + health, description, hints,
+  │   solution control, attempt actions pinned at the bottom
+  │   │ Workspace (flex: 1, min-width: 0): editor + preview, output pane below
+```
+
+The reference column sits *beside* the editor rather than above it, so a long
+description or a fully revealed hint list costs reading width, never editor
+height — the document never grows past the viewport. Folder routes render two
+columns; there is no empty reference column where there is no problem.
+
+`ProblemWorkspace` returns a fragment of the reference panel and the workspace
+area, so the shell is genuinely three columns while every piece of attempt state
+stays owned in one component. Collapse state lives in `App`, above the routes,
+so toggling it re-renders but never remounts the workspace.
+
 ## Layers
 
 ```

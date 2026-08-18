@@ -4,7 +4,7 @@ import { AttemptActions } from '../AttemptActions/AttemptActions';
 import { CodeEditor } from '../CodeEditor/CodeEditor';
 import { OutputPane } from '../OutputPane/OutputPane';
 import { FileTabs } from '../FileTabs/FileTabs';
-import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
+import { ProblemContextPanel } from '../ProblemContextPanel/ProblemContextPanel';
 import { SolutionViewer } from '../SolutionViewer/SolutionViewer';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime, type EvaluationSummary } from '../../hooks/useRuntime';
@@ -37,6 +37,11 @@ function newRecordId(): string {
  * Wires the layers together for one problem:
  *   problem -> editor(s) -> (debounce) -> runtime -> console (+ preview)
  * and owns the practice session running on top of them.
+ *
+ * Renders as a fragment of two shell columns — the reference panel and the
+ * coding area — so the app is genuinely three columns while everything about
+ * the attempt (source, hints, solution reveal, counters) stays owned here in
+ * one place rather than being split across them.
  *
  * Mounted with a key that changes per problem and per attempt, so ending a
  * session replaces this subtree outright: sources reseed from the problem
@@ -273,10 +278,21 @@ export function ProblemWorkspace({
   }, [run, source, generation]);
 
   return (
-    <div className="problem-workspace">
-      <ProblemPanel
+    <>
+      <ProblemContextPanel
         problem={problem}
         health={<HealthBadge health={summary.health} />}
+        assistance={
+          <AssistancePanel
+            problem={problem}
+            revealedHintIds={progress.revealedHintIds}
+            solutionRevealed={progress.solutionRevealed}
+            busy={submitting}
+            onRevealHint={revealHint}
+            onRevealSolution={revealSolution}
+            onOpenSolution={() => setShowSolution(true)}
+          />
+        }
         actions={
           <AttemptActions
             hasAttempt={hasAttempt}
@@ -289,66 +305,58 @@ export function ProblemWorkspace({
         }
       />
 
-      {/* Its own row, outside the scrollable description: the reveal controls
-          must always be reachable without hunting for them. */}
-      <AssistancePanel
-        problem={problem}
-        revealedHintIds={progress.revealedHintIds}
-        solutionRevealed={progress.solutionRevealed}
-        busy={submitting}
-        onRevealHint={revealHint}
-        onRevealSolution={revealSolution}
-        onOpenSolution={() => setShowSolution(true)}
-      />
-
-      {showSolution && problem.solution && (
-        <SolutionViewer problem={problem} onClose={() => setShowSolution(false)} />
-      )}
-
-      <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
-        <section className="editor-pane">
-          {problem.files.length > 1 ? (
-            <FileTabs files={problem.files} activeFileId={activeFile.id} onSelect={setActiveFileId} />
-          ) : (
-            <header className="pane-header">
-              <span>{activeFile.name}</span>
-              <span className="hint">runs automatically as you type</span>
-            </header>
-          )}
-          <div className="editor-host">
-            <CodeEditor
-              // One Monaco model per problem file, so undo/redo history and
-              // diagnostics can never cross a file or problem boundary.
-              path={modelPath(activeFile.id)}
-              ownedPaths={ownedPaths}
-              value={contents[activeFile.id] ?? ''}
-              language={activeFile.language}
-              onChange={updateActiveFile}
-            />
-          </div>
-        </section>
-
-        {hasPreview && (
-          <section className="preview-pane">
-            <header className="pane-header">
-              <span>Preview</span>
-              <span className="hint">sandboxed, rebuilt on every run</span>
-            </header>
-            {/* The runtime mounts its own isolated surface in here; the UI layer
-                owns the container, never what goes inside it. */}
-            <div className="preview-host" ref={previewRef} />
-          </section>
+      <div className="workspace-area">
+        {/* Still a drawer over the coding area rather than inline in the
+            reference column, so a long solution cannot crowd out the hints. */}
+        {showSolution && problem.solution && (
+          <SolutionViewer problem={problem} onClose={() => setShowSolution(false)} />
         )}
 
-        <OutputPane
-          entries={entries}
-          status={status}
-          evaluation={evaluation}
-          onRunTests={suite && canEvaluate ? () => evaluate('practice') : undefined}
-          summary={summary}
-          now={now}
-        />
-      </main>
-    </div>
+        <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
+          <section className="editor-pane">
+            {problem.files.length > 1 ? (
+              <FileTabs files={problem.files} activeFileId={activeFile.id} onSelect={setActiveFileId} />
+            ) : (
+              <header className="pane-header">
+                <span>{activeFile.name}</span>
+                <span className="hint">runs automatically as you type</span>
+              </header>
+            )}
+            <div className="editor-host">
+              <CodeEditor
+                // One Monaco model per problem file, so undo/redo history and
+                // diagnostics can never cross a file or problem boundary.
+                path={modelPath(activeFile.id)}
+                ownedPaths={ownedPaths}
+                value={contents[activeFile.id] ?? ''}
+                language={activeFile.language}
+                onChange={updateActiveFile}
+              />
+            </div>
+          </section>
+
+          {hasPreview && (
+            <section className="preview-pane">
+              <header className="pane-header">
+                <span>Preview</span>
+                <span className="hint">sandboxed, rebuilt on every run</span>
+              </header>
+              {/* The runtime mounts its own isolated surface in here; the UI layer
+                  owns the container, never what goes inside it. */}
+              <div className="preview-host" ref={previewRef} />
+            </section>
+          )}
+
+          <OutputPane
+            entries={entries}
+            status={status}
+            evaluation={evaluation}
+            onRunTests={suite && canEvaluate ? () => evaluate('practice') : undefined}
+            summary={summary}
+            now={now}
+          />
+        </main>
+      </div>
+    </>
   );
 }

@@ -265,7 +265,7 @@ function FolderNode({
  * organization changes this component's data only — it never touches the route,
  * so the workspace beside it is not remounted.
  */
-export function ProblemTree() {
+export function ProblemTree({ onCollapse }: { onCollapse?: () => void }) {
   const taxonomyActions = useTaxonomy();
   const { taxonomy } = taxonomyActions;
   const insights = usePracticeInsights();
@@ -346,14 +346,29 @@ export function ProblemTree() {
     <nav className="problem-list" aria-label="Problems">
       <header className="pane-header">
         <span>Problems</span>
-        <button
-          type="button"
-          className="row-actions"
-          aria-label="New root folder"
-          onClick={() => setAction({ kind: 'create', parentId: null })}
-        >
-          +
-        </button>
+        <span className="pane-header-actions">
+          <button
+            type="button"
+            className="row-actions"
+            aria-label="New root folder"
+            title="New root folder"
+            onClick={() => setAction({ kind: 'create', parentId: null })}
+          >
+            +
+          </button>
+          {onCollapse && (
+            <button
+              type="button"
+              className="nav-toggle"
+              aria-expanded
+              aria-label="Collapse problem navigation"
+              title="Collapse problem navigation"
+              onClick={onCollapse}
+            >
+              ⟨
+            </button>
+          )}
+        </span>
       </header>
 
       {error && <p className="tree-error">{error}</p>}
