@@ -5,6 +5,8 @@ interface ProblemPanelProps {
   problem: Problem;
   /** Attempt-level controls, shown alongside the title. */
   actions?: ReactNode;
+  /** Compact health reading, shown beside the title. */
+  health?: ReactNode;
 }
 
 /** Renders `inline code` spans; everything else is plain text. */
@@ -15,11 +17,12 @@ function renderParagraph(text: string) {
 }
 
 /** Renders the problem statement. Plain paragraphs — no markdown engine yet. */
-export function ProblemPanel({ problem, actions }: ProblemPanelProps) {
+export function ProblemPanel({ problem, actions, health }: ProblemPanelProps) {
   return (
     <header className="problem">
       <div className="problem-heading">
         <h1>{problem.title}</h1>
+        {health}
         {actions}
       </div>
       {problem.description.split('\n\n').map((paragraph, index) => (

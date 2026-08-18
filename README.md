@@ -212,6 +212,58 @@ no parallel selection state, so reloads, deep links and browser Back/Forward all
 stay consistent, and the tree highlight and ancestor expansion follow from the
 route.
 
+## Knowledge health
+
+Health is **derived**, never stored: `calculateProblemHealth(records, now)` in
+`practice/health.ts` reads the latest `PracticeRecord` and decays it. That is
+deliberate — the formula is a heuristic and will change, and deriving means past
+sessions are re-scored under the new rule rather than leaving stale numbers.
+
+```
+health = startingHealth × 0.5 ^ (daysSincePractice / halfLifeDays)
+```
+
+| Mastery | Starts at | Half-life |
+| --- | --- | --- |
+| 1 | 20 | 2 days |
+| 2 | 40 | 5 days |
+| 3 | 60 | 10 days |
+| 4 | 80 | 21 days |
+| 5 | 100 | 45 days |
+
+Bands: ≥75 strong, ≥50 good, ≥25 review soon, below that at risk. **Never
+practised is its own state**, not 0% — "no information" and "practised and since
+forgotten" call for opposite actions.
+
+v1 scores from the latest session only, chosen by `completedAt` on a sorted copy
+rather than array position. Older attempts stay visible in history and are not
+discarded: they are what a future scheduling model will need.
+
+## Folder health
+
+Folder metrics aggregate the per-problem model recursively through the taxonomy.
+Health and coverage stay separate because they answer different questions:
+
+```
+health   = mean(score of practiced descendants)   // unpracticed excluded
+coverage = practiced descendants / all descendants
+```
+
+Averaging unpractised problems in as zeroes would make a barely-started folder
+look forgotten rather than new, so folders have three distinct states: `empty`
+(no descendant problems), `unpracticed` (problems but no records — shown as
+`New · 0/5`), and `practiced`. Descendants come from `getProblemsInSubtree`, so
+nesting is handled at any depth and nothing is counted twice.
+
+Every row in the sidebar carries a right-aligned health rail — `82%` / `New` for
+problems, `72% · 3/5` / `New · 0/5` / `Empty` for folders — computed once per
+render by `PracticeInsightsProvider` and read from an index, never per row.
+
+`/folder/:folderId` opens a folder page with health, coverage, **review
+priority** (practised descendants, weakest first: lower health → practised
+longer ago → lower mastery → id) and a separate **not practiced** list. Folder
+ids are stable, so renaming or moving the folder being viewed keeps the route.
+
 ## Practice sessions
 
 A problem may carry ordered `hints` and a `solution` keyed by the same file ids

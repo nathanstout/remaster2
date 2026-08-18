@@ -9,8 +9,12 @@ import { SolutionViewer } from '../SolutionViewer/SolutionViewer';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime, type EvaluationSummary } from '../../hooks/useRuntime';
 import { deleteAttempt, emptyProgress, loadAttempt, saveAttempt } from '../../persistence/attempts';
-import { appendRecord } from '../../persistence/history';
+
+import { summarizeProblemPractice } from '../../practice/historyQueries';
+import { usePracticeHistory } from '../../practice/practiceHistoryContext';
 import { calculateMastery } from '../../practice/scoring';
+import { useNow } from '../../hooks/useNow';
+import { HealthBadge } from '../PracticePanel/HealthBadge';
 import { matchesStarter, starterFiles } from '../../problems';
 import { supportsPreview } from '../../runtime/createRuntime';
 import type { AttemptProgress, PracticeOutcome, PracticeRecord } from '../../types/practice';
@@ -73,6 +77,15 @@ export function ProblemWorkspace({
   const [showSolution, setShowSolution] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [recordError, setRecordError] = useState<string | null>(null);
+
+  const { records, append } = usePracticeHistory();
+  const now = useNow();
+  // Derived on every render from stored records and the clock — never cached
+  // next to the problem, so a new session updates it with no reload.
+  const summary = useMemo(
+    () => summarizeProblemPractice(records, problem.id, now),
+    [records, problem.id, now],
+  );
 
   const debouncedContents = useDebouncedValue(contents, EDIT_DEBOUNCE_MS);
   const {
@@ -188,7 +201,7 @@ export function ProblemWorkspace({
         finalTestsTotal: finalTests.total,
       };
 
-      if (!appendRecord(record)) {
+      if (!append(record)) {
         setRecordError('Could not save this practice session. Your attempt is untouched.');
         return false;
       }
@@ -197,7 +210,7 @@ export function ProblemWorkspace({
       onAttemptEnded(record);
       return true;
     },
-    [problem, progress, onAttemptEnded],
+    [problem, progress, onAttemptEnded, append],
   );
 
   const suite = problem.tests;
@@ -263,6 +276,7 @@ export function ProblemWorkspace({
     <div className="problem-workspace">
       <ProblemPanel
         problem={problem}
+        health={<HealthBadge health={summary.health} />}
         actions={
           <AttemptActions
             hasAttempt={hasAttempt}
@@ -331,6 +345,8 @@ export function ProblemWorkspace({
           status={status}
           evaluation={evaluation}
           onRunTests={suite && canEvaluate ? () => evaluate('practice') : undefined}
+          summary={summary}
+          now={now}
         />
       </main>
     </div>

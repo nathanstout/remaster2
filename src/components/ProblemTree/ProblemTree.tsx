@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useMatch } from 'react-router-dom';
+import { usePracticeInsights } from '../../practice/practiceInsightsContext';
+import { FolderRail, ProblemRail } from './HealthRail';
 import { getProblem } from '../../problems';
 import {
   getAncestorFolders,
@@ -26,6 +28,8 @@ type RowAction =
 
 interface TreeContext {
   taxonomy: Taxonomy;
+  /** Shared derived metrics; rows never compute health themselves. */
+  insights: ReturnType<typeof usePracticeInsights>;
   /** The domain layer. The tree requests mutations; it never performs them. */
   taxonomyActions: ReturnType<typeof useTaxonomy>;
   action: RowAction;
@@ -104,16 +108,25 @@ function FolderNode({
   return (
     <li className="tree-node">
       <div className="tree-row">
+        {/* Chevron and label are separate controls: expanding a folder to look
+            inside it is a different intent from opening its detail page. */}
         <button
           type="button"
-          className="tree-folder"
-          style={{ paddingLeft: `${8 + depth * 14}px` }}
+          className="tree-caret-button"
+          style={{ marginLeft: `${4 + depth * 14}px` }}
           aria-expanded={isOpen}
+          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${folder.name}`}
           onClick={() => onToggle(folder.id)}
         >
           <span className="tree-caret">{isOpen ? '▾' : '▸'}</span>
-          {folder.name}
         </button>
+        <NavLink
+          to={`/folder/${folder.id}`}
+          className={({ isActive }) => (isActive ? 'tree-folder selected' : 'tree-folder')}
+        >
+          {folder.name}
+        </NavLink>
+        <FolderRail summary={context.insights.folderSummary(folder.id)} name={folder.name} />
         <button
           type="button"
           className="row-actions"
@@ -192,10 +205,14 @@ function FolderNode({
                   <NavLink
                     to={`/problem/${problemId}`}
                     className={({ isActive }) => (isActive ? 'tree-problem selected' : 'tree-problem')}
-                    style={{ paddingLeft: `${22 + depth * 14}px` }}
+                    style={{ paddingLeft: `${26 + depth * 14}px` }}
                   >
                     {problem.title}
                   </NavLink>
+                  <ProblemRail
+                    health={context.insights.problemHealth(problemId)}
+                    title={problem.title}
+                  />
                   <button
                     type="button"
                     className="row-actions"
@@ -248,19 +265,32 @@ function FolderNode({
  * organization changes this component's data only — it never touches the route,
  * so the workspace beside it is not remounted.
  */
-export function ProblemTree({ activeProblemId }: { activeProblemId: string | undefined }) {
+export function ProblemTree() {
   const taxonomyActions = useTaxonomy();
   const { taxonomy } = taxonomyActions;
+  const insights = usePracticeInsights();
+  // Selection comes from the URL for both kinds of route, so there is no
+  // separate tree state that could disagree with the address bar.
+  const problemMatch = useMatch('/problem/:problemId');
+  const folderMatch = useMatch('/folder/:folderId');
+  const activeProblemId = problemMatch?.params.problemId;
+  const activeFolderId = folderMatch?.params.folderId;
   const [action, setAction] = useState<RowAction>({ kind: 'none' });
   const [error, setError] = useState<string | null>(null);
 
   // Folders that must be open for the routed problem to be visible.
   const requiredOpen = useMemo(() => {
-    if (!activeProblemId) return [];
-    const folderId = getFolderForProblem(taxonomy, activeProblemId);
-    if (!folderId) return [];
-    return [...getAncestorFolders(taxonomy, folderId).map((f) => f.id), folderId];
-  }, [taxonomy, activeProblemId]);
+    if (activeProblemId) {
+      const folderId = getFolderForProblem(taxonomy, activeProblemId);
+      if (!folderId) return [];
+      return [...getAncestorFolders(taxonomy, folderId).map((f) => f.id), folderId];
+    }
+    if (activeFolderId) {
+      // Ancestors only: the folder itself needs to be *visible*, not opened.
+      return getAncestorFolders(taxonomy, activeFolderId).map((f) => f.id);
+    }
+    return [];
+  }, [taxonomy, activeProblemId, activeFolderId]);
 
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(requiredOpen));
 
@@ -301,6 +331,7 @@ export function ProblemTree({ activeProblemId }: { activeProblemId: string | und
 
   const context: TreeContext = {
     taxonomy,
+    insights,
     taxonomyActions,
     action,
     setAction,

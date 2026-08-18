@@ -186,7 +186,7 @@ body {
 /* -------------------------------------------------------- problem list */
 
 .problem-list {
-  flex: 0 0 210px;
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -239,13 +239,49 @@ body {
 
 .tree-row {
   display: flex;
-  align-items: stretch;
+  align-items: center;
 }
 
+/* The label takes the slack and truncates; the rail keeps its own column, so
+   metrics stay aligned no matter how deep the nesting or how long the name. */
 .tree-row .tree-folder,
 .tree-row .tree-problem {
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-caret-button {
+  flex: 0 0 auto;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.health-rail {
+  flex: 0 0 auto;
+  min-width: 74px;
+  padding-left: 6px;
+  text-align: right;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.health-rail.band-strong { color: #8fbf7f; }
+.health-rail.band-good { color: #7aa2f7; }
+.health-rail.band-review-soon { color: #e5c07b; }
+.health-rail.band-at-risk { color: #e06c75; }
+.health-rail.band-unpracticed { color: #6f7787; }
+
+.tree-folder.selected {
+  color: #fff;
+  font-weight: 600;
 }
 
 .row-actions {
@@ -398,6 +434,248 @@ body {
 .problem h1 {
   margin: 0;
   font-size: 18px;
+}
+
+/* ---------------------------------------------------- folder detail */
+
+.folder-detail {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.breadcrumb {
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.breadcrumb a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.folder-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 760px;
+}
+
+.folder-body h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.folder-metrics h2:not(:first-child) {
+  margin-top: 16px;
+}
+
+.folder-metrics p {
+  margin: 0;
+}
+
+.review-priority ul,
+.not-practiced ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-priority li {
+  padding: 8px 0;
+  border-top: 1px solid #212630;
+}
+
+.not-practiced li {
+  padding: 5px 0;
+}
+
+.review-priority a,
+.not-practiced a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.review-priority a:hover,
+.not-practiced a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.review-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* --------------------------------------------------- knowledge health */
+
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.health-badge.unpracticed {
+  font-style: italic;
+}
+
+.health-bar {
+  display: inline-block;
+  width: 70px;
+  height: 6px;
+  border-radius: 3px;
+  background: #2b303b;
+  overflow: hidden;
+}
+
+.health-bar.large {
+  width: 160px;
+  height: 9px;
+  border-radius: 5px;
+}
+
+.health-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.band-strong .health-bar-fill,
+.health-readout .band-strong { color: #8fbf7f; }
+.band-strong .health-bar-fill { background: #8fbf7f; }
+.band-good .health-bar-fill { background: #7aa2f7; }
+.band-review-soon .health-bar-fill { background: #e5c07b; }
+.band-at-risk .health-bar-fill { background: #e06c75; }
+
+.health-band-label.band-strong { color: #8fbf7f; }
+.health-band-label.band-good { color: #7aa2f7; }
+.health-band-label.band-review-soon { color: #e5c07b; }
+.health-band-label.band-at-risk { color: #e06c75; }
+
+.health-score {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* ------------------------------------------------------ practice panel */
+
+.practice-panel {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 12px 14px 16px;
+  font-size: 13px;
+}
+
+.practice-panel h2 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.health-readout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.health-readout .health-score {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.health-facts {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+
+.health-facts dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.health-facts dd {
+  margin: 2px 0 0;
+}
+
+.mastery-trend {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.practice-empty {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.practice-history ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-row {
+  padding: 8px 0;
+  border-top: 1px solid #212630;
+}
+
+.history-headline {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.history-date {
+  font-weight: 600;
+}
+
+.history-outcome.solved { color: #8fbf7f; }
+.history-outcome.gave-up { color: #e5c07b; }
+
+.history-mastery {
+  font-variant-numeric: tabular-nums;
+}
+
+.history-details {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.history-solution {
+  color: #c9a0a4;
 }
 
 /* -------------------------------------------------- attempt actions */
