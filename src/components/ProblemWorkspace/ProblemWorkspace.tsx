@@ -4,6 +4,7 @@ import { Console } from '../Console/Console';
 import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime } from '../../hooks/useRuntime';
+import { supportsPreview } from '../../runtime/createRuntime';
 import type { Problem } from '../../types/problem';
 
 /** How long the user has to stop typing before we re-execute. */
@@ -22,7 +23,8 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
   const file = problem.files[0];
   const [code, setCode] = useState(file.starterCode);
   const debouncedCode = useDebouncedValue(code, EDIT_DEBOUNCE_MS);
-  const { entries, status, run, generation } = useRuntime(problem);
+  const { entries, status, run, generation, previewRef } = useRuntime(problem);
+  const hasPreview = supportsPreview(problem);
 
   const source = useMemo(
     () => ({ files: { [file.id]: debouncedCode }, entry: file.id }),
@@ -39,7 +41,7 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
     <div className="problem-workspace">
       <ProblemPanel problem={problem} />
 
-      <main className="workspace">
+      <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
         <section className="editor-pane">
           <header className="pane-header">
             <span>{file.name}</span>
@@ -56,6 +58,18 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
             />
           </div>
         </section>
+
+        {hasPreview && (
+          <section className="preview-pane">
+            <header className="pane-header">
+              <span>Preview</span>
+              <span className="hint">sandboxed, rebuilt on every run</span>
+            </header>
+            {/* The runtime mounts its own isolated surface in here; the UI layer
+                owns the container, never what goes inside it. */}
+            <div className="preview-host" ref={previewRef} />
+          </section>
+        )}
 
         <Console entries={entries} status={status} />
       </main>

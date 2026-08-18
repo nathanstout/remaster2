@@ -40,3 +40,24 @@ window.MonacoEnvironment = {
 };
 
 loader.config({ monaco });
+
+/**
+ * Editing support for the React problems' TSX.
+ *
+ * Semantic validation is off on purpose: no `@types/react` is loaded into the
+ * browser language service, so every `import { useState } from 'react'` would
+ * otherwise be underlined as an unresolved module. Syntax validation, JSX
+ * parsing and highlighting all still work, which is the useful part here.
+ */
+monaco.typescript.typescriptDefaults.setCompilerOptions({
+  target: monaco.typescript.ScriptTarget.ES2020,
+  jsx: monaco.typescript.JsxEmit.ReactJSX,
+  allowJs: true,
+  allowNonTsExtensions: true,
+  moduleResolution: monaco.typescript.ModuleResolutionKind.NodeJs,
+});
+
+monaco.typescript.typescriptDefaults.setDiagnosticsOptions({
+  noSemanticValidation: true,
+  noSyntaxValidation: false,
+});

@@ -1,4 +1,5 @@
 import type { Problem } from '../types/problem';
+import { counterProblem } from './counter';
 import { debounceProblem } from './debounce';
 import { flattenObjectProblem } from './flattenObject';
 import { myMapProblem } from './myMap';
@@ -7,7 +8,7 @@ import { myMapProblem } from './myMap';
  * The problem catalogue. Local data for now; the accessors below are the seam
  * where real API calls go later.
  */
-const catalogue: Problem[] = [debounceProblem, myMapProblem, flattenObjectProblem];
+const catalogue: Problem[] = [debounceProblem, myMapProblem, flattenObjectProblem, counterProblem];
 
 const byId: Record<string, Problem> = Object.fromEntries(
   catalogue.map((problem) => [problem.id, problem]),

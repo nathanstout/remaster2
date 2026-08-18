@@ -64,3 +64,22 @@ export interface RuntimeSource {
   files: Record<string, string>;
   entry: string;
 }
+
+/**
+ * A runtime that renders something the user can look at and interact with.
+ *
+ * Modeled as an extension rather than as optional members on `Runtime`, so a
+ * headless runtime like the Worker-backed JavaScript one is never forced to
+ * implement preview methods that mean nothing to it.
+ */
+export interface PreviewRuntime extends Runtime {
+  /** Attach the isolated preview surface to a container owned by the UI. */
+  mount(container: HTMLElement): void;
+  /** Detach it again, leaving the runtime otherwise usable. */
+  unmount(): void;
+}
+
+export function isPreviewRuntime(runtime: Runtime): runtime is PreviewRuntime {
+  const candidate = runtime as Partial<PreviewRuntime>;
+  return typeof candidate.mount === 'function' && typeof candidate.unmount === 'function';
+}

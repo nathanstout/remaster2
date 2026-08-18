@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRuntime } from '../runtime/createRuntime';
 import type { Problem } from '../types/problem';
-import type {
-  ConsoleLevel,
-  Runtime,
-  RuntimeEvent,
-  RuntimeSource,
-  SerializedValue,
+import {
+  isPreviewRuntime,
+  type ConsoleLevel,
+  type Runtime,
+  type RuntimeEvent,
+  type RuntimeSource,
+  type SerializedValue,
 } from '../types/runtime';
 
 export type ConsoleEntry =
@@ -25,6 +26,11 @@ export interface RuntimeController {
    * replacement runtime (problem switch, or React's dev-mode remount).
    */
   generation: number;
+  /**
+   * Ref callback for the preview container. Harmless to attach for runtimes
+   * without preview capability — it simply never gets used.
+   */
+  previewRef: (element: HTMLElement | null) => void;
 }
 
 /**
@@ -36,6 +42,7 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
   const [status, setStatus] = useState<RunStatus>('idle');
   const [generation, setGeneration] = useState(0);
   const runtimeRef = useRef<Runtime | null>(null);
+  const containerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!problem) return;
@@ -69,6 +76,11 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
 
     const runtime = createRuntime(problem, handleEvent);
     runtimeRef.current = runtime;
+    // Refs are attached during commit, before this effect runs, so the
+    // container is usually already waiting for the runtime that will use it.
+    if (isPreviewRuntime(runtime) && containerRef.current) {
+      runtime.mount(containerRef.current);
+    }
     setGeneration((value) => value + 1);
 
     return () => {
@@ -81,5 +93,13 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
     runtimeRef.current?.run(source);
   }, []);
 
-  return { entries, status, run, generation };
+  const previewRef = useCallback((element: HTMLElement | null) => {
+    containerRef.current = element;
+    const runtime = runtimeRef.current;
+    if (!runtime || !isPreviewRuntime(runtime)) return;
+    if (element) runtime.mount(element);
+    else runtime.unmount();
+  }, []);
+
+  return { entries, status, run, generation, previewRef };
 }

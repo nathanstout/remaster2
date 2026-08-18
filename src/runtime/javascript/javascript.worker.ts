@@ -1,5 +1,5 @@
 /// <reference lib="es2023" />
-import { serialize } from './serialize';
+import { serialize } from '../shared/serialize';
 import type { WorkerInbound, WorkerOutbound } from './protocol';
 import type { ConsoleLevel } from '../../types/runtime';
 

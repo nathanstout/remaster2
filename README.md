@@ -1,7 +1,8 @@
 # JS Practice
 
-A LeetCode-style playground for practical JavaScript problems. Prototype scope:
-**problem catalogue → editor → isolated execution → console**.
+A LeetCode-style playground for practical JavaScript and React problems.
+Prototype scope: **problem catalogue → editor → isolated execution → console
+(+ preview)**.
 
 ```
 npm install
@@ -51,11 +52,18 @@ src/
     index.ts          catalogue: listProblems() + getProblem()
   runtime/
     createRuntime.ts              problem type -> runtime implementation
+    shared/
+      serialize.ts                clone-safe value serialization (both runtimes)
     javascript/
       JavaScriptWorkerRuntime.ts  host side: worker lifecycle + timeouts
       javascript.worker.ts        sandbox: console, timers, error traps
       protocol.ts                 typed worker <-> host messages
-      serialize.ts                clone-safe value serialization
+    react/
+      ReactPreviewRuntime.ts      host side: iframe lifecycle + stale fencing
+      compiler.ts                 esbuild-wasm singleton (TSX -> CJS)
+      previewDocument.ts          the generated sandbox document
+      reactRuntimeSources.ts      React/ReactDOM as inlined text
+      protocol.ts                 typed iframe <-> host messages
   types/
     problem.ts
     runtime.ts
@@ -70,6 +78,32 @@ state is dropped, and `useRuntime`'s cleanup disposes the runtime — terminatin
 its Worker and any timers it still had pending. Each problem file gets its own
 Monaco model URI, so undo history and diagnostics never cross problems.
 
+## Runtimes
+
+`Runtime` stays minimal (`run`/`dispose`). Runtimes that render also implement
+`PreviewRuntime` (`mount`/`unmount`), detected with `isPreviewRuntime`, so the
+headless Worker runtime is never asked for preview behaviour it does not have.
+
+| Problem type | Runtime | Isolation |
+| --- | --- | --- |
+| `javascript` | `JavaScriptWorkerRuntime` | disposable Web Worker |
+| `react` | `ReactPreviewRuntime` | disposable `sandbox="allow-scripts"` iframe |
+
+### React preview
+
+TSX is compiled by esbuild-wasm (initialized once, module-scoped promise) to
+**CommonJS**, then inlined into a `srcdoc` document alongside React itself. The
+frame has an opaque origin, which is what forces that design: it cannot read the
+parent's blob: URLs and cannot fetch our modules, so `import { useState } from
+'react'` becomes `require("react")` and resolves against a tiny module registry
+holding React's source text (taken from this app's own `node_modules`, so
+versions always match). No import maps, no CDN, no network.
+
+The runtime mounts the user's default export itself — problems never call
+`createRoot`. Console output and errors return over `postMessage`, serialized
+with the same module the Worker runtime uses, and are validated by source
+window, channel tag and run id before reaching the console.
+
 ## Execution model
 
 Every run gets a brand-new `Worker`. On each settled edit the runtime terminates
@@ -81,6 +115,16 @@ Timeouts are enforced from the host, which is unaffected by a blocked worker:
 
 - **4s** to finish the synchronous body → otherwise terminate + `Execution timed out.`
 - **10s** total, covering pending timers → otherwise terminate with a note.
+
+The React preview is destroyed and rebuilt per run too, but a *finished* run
+stays alive so the rendered output remains clickable; only its 8s bootstrap
+watchdog can tear it down.
+
+Measured in Chrome: a `while (true) {}` inside the preview did **not** block the
+host (max event-loop gap 101ms), because Chrome gives the opaque-origin sandbox
+its own process, and the watchdog then removed the frame. This is a browser
+behaviour, not a guarantee the architecture provides — see the note in
+`ReactPreviewRuntime`.
 
 ## Adding a runtime later
 
