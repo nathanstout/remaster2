@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AttemptActions } from '../AttemptActions/AttemptActions';
 import { CodeEditor } from '../CodeEditor/CodeEditor';
 import { OutputPane } from '../OutputPane/OutputPane';
 import { FileTabs } from '../FileTabs/FileTabs';
 import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime } from '../../hooks/useRuntime';
+import { deleteDraft, loadDraft, saveDraft } from '../../persistence/drafts';
+import { matchesStarter, starterFiles } from '../../problems';
 import { supportsPreview } from '../../runtime/createRuntime';
 import type { Problem } from '../../types/problem';
 
@@ -20,11 +23,19 @@ const EDIT_DEBOUNCE_MS = 400;
  * console state is dropped, Monaco models are disposed, and `useRuntime`'s
  * cleanup disposes the runtime — terminating its Worker or iframe.
  */
-export function ProblemWorkspace({ problem }: { problem: Problem }) {
-  // One entry per file, seeded from the problem definition. Edits live here for
-  // as long as this problem is mounted, and nowhere else.
-  const [contents, setContents] = useState<Record<string, string>>(() =>
-    Object.fromEntries(problem.files.map((file) => [file.id, file.starterCode])),
+export function ProblemWorkspace({
+  problem,
+  onAttemptEnded,
+}: {
+  problem: Problem;
+  /** Asks the parent to remount this workspace with a clean slate. */
+  onAttemptEnded: () => void;
+}) {
+  // One entry per file: a resumable draft if one was saved, otherwise the
+  // starter. Resolving it in the initializer — before the first render — is
+  // what stops a restored attempt from flashing starter code on the way in.
+  const [contents, setContents] = useState<Record<string, string>>(
+    () => loadDraft(problem) ?? starterFiles(problem),
   );
   const [activeFileId, setActiveFileId] = useState(problem.files[0].id);
 
@@ -71,6 +82,36 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
     [activeFile.id, clearEvaluation],
   );
 
+  // Derived, not stored: an attempt exists exactly when the source differs from
+  // the starter, which is also precisely when a draft should be on disk.
+  const hasAttempt = !matchesStarter(problem, contents);
+
+  // Saving rides the same settle as execution. Editing back to the starter
+  // removes the draft, so merely opening a problem never leaves one behind.
+  useEffect(() => {
+    if (matchesStarter(problem, debouncedContents)) deleteDraft(problem.id);
+    else saveDraft(problem, debouncedContents);
+  }, [problem, debouncedContents]);
+
+  /**
+   * Throw away the current work and start this problem again. Deliberately
+   * separate from finishing: it records nothing, because nothing was practised.
+   */
+  const handleReset = useCallback(() => {
+    deleteDraft(problem.id);
+    onAttemptEnded();
+  }, [problem.id, onAttemptEnded]);
+
+  /**
+   * End the practice session. Passing the tests is not required — this says
+   * "I am done for now", not "I was correct". Phase 8 will additionally record
+   * a practice entry here; resetting will still record nothing.
+   */
+  const handleFinish = useCallback(() => {
+    deleteDraft(problem.id);
+    onAttemptEnded();
+  }, [problem.id, onAttemptEnded]);
+
   const suite = problem.tests;
   const handleRunTests = useCallback(() => {
     if (!suite) return;
@@ -88,7 +129,12 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
 
   return (
     <div className="problem-workspace">
-      <ProblemPanel problem={problem} />
+      <ProblemPanel
+        problem={problem}
+        actions={
+          <AttemptActions hasAttempt={hasAttempt} onFinish={handleFinish} onReset={handleReset} />
+        }
+      />
 
       <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
         <section className="editor-pane">

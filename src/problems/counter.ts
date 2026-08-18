@@ -60,6 +60,7 @@ await waitFor(() => button.textContent.includes('3'), {
 
 export const counterProblem: Problem = {
   id: 'counter',
+  version: 1,
   title: 'Build a Counter',
   type: 'react',
   description: [

@@ -24,6 +24,12 @@ export interface ProblemFile {
 export interface Problem {
   id: string;
   title: string;
+  /**
+   * Bumped whenever starter code or file ids change materially. Saved drafts
+   * written against an older version are discarded, so editing a problem during
+   * development cannot leave mysterious stale code behind.
+   */
+  version: number;
   /** Markdown-ish plain text; rendered as simple paragraphs for now. */
   description: string;
   type: ProblemType;

@@ -179,6 +179,29 @@ Tests get a tiny API: `assert.ok/equal/deepEqual/includes`, `sleep`, `waitFor`.
 Each case has its own timeout (2s default), and a hang fails only that case.
 Editing clears results and cancels any run in flight; so does switching problems.
 
+## Attempts
+
+An unfinished attempt is saved automatically to `localStorage` under
+`practice-app:draft:<problemId>` and restored when the problem is reopened. The
+draft is resolved in the workspace's state initializer, before the first render,
+so a restored attempt never flashes starter code on the way in.
+
+A draft exists exactly when the source differs from the starter: opening a
+problem and leaving writes nothing, and editing everything back to the starter
+removes the record. `Problem.version` is compared against the saved
+`problemVersion`, so changing a problem definition discards drafts written
+against the old one instead of resurrecting stale code.
+
+Two distinct ways to end an attempt, both of which drop the draft and remount the
+workspace for a genuinely clean slate:
+
+- **Reset Attempt** — start this problem over. Destructive, so it confirms inline.
+- **Finish Attempt** — done practising. Never requires passing tests; this is
+  where a practice record will later be written, and reset never will.
+
+Only source text is persisted. Console output, previews, runtime state and test
+results are always rebuilt from scratch.
+
 ## Editing
 
 Workspace state is `Record<fileId, string>`, seeded from the problem definition

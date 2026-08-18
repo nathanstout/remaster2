@@ -86,6 +86,7 @@ assert.deepEqual(result, { tags: ['a', 'b'], meta: null, 'user.id': 1 });`,
 
 export const flattenObjectProblem: Problem = {
   id: 'flatten-object',
+  version: 1,
   title: 'Flatten a nested object',
   type: 'javascript',
   description: [

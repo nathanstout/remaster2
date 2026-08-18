@@ -106,6 +106,7 @@ assert.equal(count, 2);`,
 
 export const debounceProblem: Problem = {
   id: 'debounce',
+  version: 1,
   title: 'Implement debounce',
   type: 'javascript',
   description: [

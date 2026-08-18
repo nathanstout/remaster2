@@ -31,3 +31,13 @@ export function listProblems(): Problem[] {
 export function getProblem(id: string): Problem | undefined {
   return byId[id];
 }
+
+/** The problem's untouched source, keyed by file id. */
+export function starterFiles(problem: Problem): Record<string, string> {
+  return Object.fromEntries(problem.files.map((file) => [file.id, file.starterCode]));
+}
+
+/** True when nothing has been attempted yet — every file is still the starter. */
+export function matchesStarter(problem: Problem, files: Record<string, string>): boolean {
+  return problem.files.every((file) => files[file.id] === file.starterCode);
+}

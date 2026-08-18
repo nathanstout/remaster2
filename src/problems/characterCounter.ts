@@ -95,6 +95,7 @@ await waitFor(() => count.textContent.trim() === '2', {
 
 export const characterCounterProblem: Problem = {
   id: 'character-counter',
+  version: 1,
   title: 'Build a Character Counter',
   type: 'web',
   description: [

@@ -73,6 +73,7 @@ assert.deepEqual(result, [3, 6]);`,
 
 export const myMapProblem: Problem = {
   id: 'my-map',
+  version: 1,
   title: 'Implement myMap',
   type: 'javascript',
   description: [

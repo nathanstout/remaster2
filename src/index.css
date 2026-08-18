@@ -93,9 +93,65 @@ body {
   background: var(--panel);
 }
 
+.problem-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
 .problem h1 {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 18px;
+}
+
+/* -------------------------------------------------- attempt actions */
+
+.attempt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.attempt-actions button {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #2b303b;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.attempt-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: #343a47;
+}
+
+.attempt-actions button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.attempt-actions button.danger:hover {
+  border-color: #e06c75;
+  background: #3a2b2f;
+}
+
+.draft-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #262b34;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.confirm-prompt {
+  color: #e5c07b;
+  font-size: 12px;
 }
 
 .problem p {
