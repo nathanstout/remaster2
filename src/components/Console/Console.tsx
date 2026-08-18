@@ -41,7 +41,11 @@ export function Console({ entries, status }: ConsoleProps) {
         )}
 
         {entries.map((entry) =>
-          entry.kind === 'console' ? (
+          entry.kind === 'notice' ? (
+            <div key={entry.id} className="console-row level-notice">
+              {entry.message}
+            </div>
+          ) : entry.kind === 'console' ? (
             <div key={entry.id} className={`console-row level-${entry.level}`}>
               {entry.args.map((arg, index) => (
                 <Fragment key={index}>

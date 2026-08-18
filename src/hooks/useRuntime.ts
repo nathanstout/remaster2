@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRuntime } from '../runtime/createRuntime';
+import { MAX_CONSOLE_ENTRIES } from '../runtime/shared/consoleLimit';
 import type { Problem } from '../types/problem';
 import {
   isPreviewRuntime,
@@ -12,7 +13,12 @@ import {
 
 export type ConsoleEntry =
   | { id: number; kind: 'console'; level: ConsoleLevel; args: SerializedValue[] }
-  | { id: number; kind: 'error'; message: string; stack?: string };
+  | { id: number; kind: 'error'; message: string; stack?: string }
+  /** Runtime-level notice, e.g. that output was cut off. Not user output. */
+  | { id: number; kind: 'notice'; message: string };
+
+
+export { MAX_CONSOLE_ENTRIES };
 
 export type RunStatus = 'idle' | 'running' | 'finished' | 'timeout' | 'error';
 
@@ -48,21 +54,46 @@ export function useRuntime(problem: Problem | undefined): RuntimeController {
     if (!problem) return;
 
     let entryId = 0;
+    // Budget is per run, and every run starts with a full one.
+    let remaining = MAX_CONSOLE_ENTRIES;
+
+    /** Returns false once the run's budget is spent, emitting one notice. */
+    const spendBudget = (): boolean => {
+      if (remaining > 0) {
+        remaining -= 1;
+        return true;
+      }
+      if (remaining === 0) {
+        remaining = -1;
+        setEntries((prev) => [
+          ...prev,
+          {
+            id: entryId++,
+            kind: 'notice',
+            message: `Output truncated after ${MAX_CONSOLE_ENTRIES} messages. The code is still running.`,
+          },
+        ]);
+      }
+      return false;
+    };
 
     const handleEvent = (event: RuntimeEvent): void => {
       switch (event.type) {
         case 'start':
-          // Every run begins from an empty console.
+          // Every run begins from an empty console and a fresh budget.
           setEntries([]);
           setStatus('running');
+          remaining = MAX_CONSOLE_ENTRIES;
           break;
         case 'console':
+          if (!spendBudget()) break;
           setEntries((prev) => [
             ...prev,
             { id: entryId++, kind: 'console', level: event.level, args: event.args },
           ]);
           break;
         case 'error':
+          if (!spendBudget()) break;
           setEntries((prev) => [
             ...prev,
             { id: entryId++, kind: 'error', message: event.message, stack: event.stack },

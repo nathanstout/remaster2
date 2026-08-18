@@ -1,4 +1,5 @@
 /// <reference lib="es2023" />
+import { CONSOLE_POST_LIMIT } from '../shared/consoleLimit';
 import { serialize } from '../shared/serialize';
 import type { WorkerInbound, WorkerOutbound } from './protocol';
 import type { ConsoleLevel } from '../../types/runtime';
@@ -98,12 +99,25 @@ function reportError(value: unknown): void {
 
 const CONSOLE_LEVELS: ConsoleLevel[] = ['log', 'info', 'warn', 'error', 'debug'];
 
+/**
+ * A runaway loop can post far faster than the host can drain the queue, so the
+ * worker stops talking once its output is past the point of being useful. The
+ * worker is disposable, so this budget is naturally per-run.
+ */
+let consolePosts = 0;
+
+function postConsole(level: ConsoleLevel, args: unknown[]): void {
+  if (consolePosts >= CONSOLE_POST_LIMIT) return;
+  consolePosts += 1;
+  post({ type: 'console', level, args: args.map((arg) => serialize(arg)) });
+}
+
 function installConsole(): void {
   const intercepted: Record<string, unknown> = {};
 
   for (const level of CONSOLE_LEVELS) {
     intercepted[level] = (...args: unknown[]) => {
-      post({ type: 'console', level, args: args.map((arg) => serialize(arg)) });
+      postConsole(level, args);
     };
   }
   // Frequently-used no-op-ish extras so calling them never throws.
@@ -114,13 +128,7 @@ function installConsole(): void {
   intercepted.groupEnd = () => {};
   intercepted.clear = () => {};
   intercepted.assert = (condition: unknown, ...args: unknown[]) => {
-    if (!condition) {
-      post({
-        type: 'console',
-        level: 'error',
-        args: [{ kind: 'string', value: 'Assertion failed:' }, ...args.map((a) => serialize(a))],
-      });
-    }
+    if (!condition) postConsole('error', ['Assertion failed:', ...args]);
   };
 
   ctx.console = intercepted;

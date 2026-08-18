@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CodeEditor } from '../CodeEditor/CodeEditor';
 import { Console } from '../Console/Console';
+import { FileTabs } from '../FileTabs/FileTabs';
 import { ProblemPanel } from '../ProblemPanel/ProblemPanel';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime } from '../../hooks/useRuntime';
@@ -12,27 +13,53 @@ const EDIT_DEBOUNCE_MS = 400;
 
 /**
  * Wires the layers together for one problem:
- *   problem -> editor -> (debounce) -> runtime -> console
+ *   problem -> editor(s) -> (debounce) -> runtime -> console (+ preview)
  *
  * Mounted with `key={problem.id}`, so selecting another problem replaces this
- * subtree outright: editable source is reseeded from the problem definition,
- * console state is dropped, and `useRuntime`'s cleanup disposes the previous
- * runtime — terminating its Worker and any timers it still had pending.
+ * subtree outright: editable sources are reseeded from the problem definition,
+ * console state is dropped, Monaco models are disposed, and `useRuntime`'s
+ * cleanup disposes the runtime — terminating its Worker or iframe.
  */
 export function ProblemWorkspace({ problem }: { problem: Problem }) {
-  const file = problem.files[0];
-  const [code, setCode] = useState(file.starterCode);
-  const debouncedCode = useDebouncedValue(code, EDIT_DEBOUNCE_MS);
+  // One entry per file, seeded from the problem definition. Edits live here for
+  // as long as this problem is mounted, and nowhere else.
+  const [contents, setContents] = useState<Record<string, string>>(() =>
+    Object.fromEntries(problem.files.map((file) => [file.id, file.starterCode])),
+  );
+  const [activeFileId, setActiveFileId] = useState(problem.files[0].id);
+
+  const debouncedContents = useDebouncedValue(contents, EDIT_DEBOUNCE_MS);
   const { entries, status, run, generation, previewRef } = useRuntime(problem);
   const hasPreview = supportsPreview(problem);
 
-  const source = useMemo(
-    () => ({ files: { [file.id]: debouncedCode }, entry: file.id }),
-    [file.id, debouncedCode],
+  const activeFile = problem.files.find((file) => file.id === activeFileId) ?? problem.files[0];
+  const modelPath = useCallback(
+    (fileId: string) => `file:///${problem.id}/${fileId}`,
+    [problem.id],
+  );
+  const ownedPaths = useMemo(
+    () => problem.files.map((file) => modelPath(file.id)),
+    [problem.files, modelPath],
   );
 
-  // Runs on mount and after every settled edit. The runtime disposes the
-  // previous execution and starts a clean one; the console clears itself.
+  // Every file always contributes, whichever one is being edited.
+  const source = useMemo(
+    () => ({ files: debouncedContents, entry: problem.files[0].id }),
+    [debouncedContents, problem.files],
+  );
+
+  const updateActiveFile = useCallback(
+    (next: string) => {
+      setContents((previous) =>
+        previous[activeFile.id] === next ? previous : { ...previous, [activeFile.id]: next },
+      );
+    },
+    [activeFile.id],
+  );
+
+  // Runs on mount and after every settled edit — but not on tab switches, which
+  // change no source. The runtime disposes the previous execution and starts a
+  // clean one; the console clears itself.
   useEffect(() => {
     run(source);
   }, [run, source, generation]);
@@ -43,18 +70,27 @@ export function ProblemWorkspace({ problem }: { problem: Problem }) {
 
       <main className={hasPreview ? 'workspace workspace-preview' : 'workspace'}>
         <section className="editor-pane">
-          <header className="pane-header">
-            <span>{file.name}</span>
-            <span className="hint">runs automatically as you type</span>
-          </header>
+          {problem.files.length > 1 ? (
+            <FileTabs
+              files={problem.files}
+              activeFileId={activeFile.id}
+              onSelect={setActiveFileId}
+            />
+          ) : (
+            <header className="pane-header">
+              <span>{activeFile.name}</span>
+              <span className="hint">runs automatically as you type</span>
+            </header>
+          )}
           <div className="editor-host">
             <CodeEditor
               // One Monaco model per problem file, so undo/redo history and
-              // diagnostics can never cross a problem boundary.
-              path={`file:///${problem.id}/${file.id}`}
-              value={code}
-              language={file.language}
-              onChange={setCode}
+              // diagnostics can never cross a file or problem boundary.
+              path={modelPath(activeFile.id)}
+              ownedPaths={ownedPaths}
+              value={contents[activeFile.id] ?? ''}
+              language={activeFile.language}
+              onChange={updateActiveFile}
             />
           </div>
         </section>

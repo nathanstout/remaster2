@@ -2,6 +2,7 @@ import type { Problem, ProblemType } from '../types/problem';
 import type { Runtime, RuntimeEventHandler } from '../types/runtime';
 import { JavaScriptWorkerRuntime } from './javascript/JavaScriptWorkerRuntime';
 import { ReactPreviewRuntime } from './react/ReactPreviewRuntime';
+import { WebPreviewRuntime } from './web/WebPreviewRuntime';
 
 /** Problem types whose runtime renders something the user can look at. */
 const PREVIEW_TYPES = new Set<ProblemType>(['react', 'web']);
@@ -31,25 +32,6 @@ export function createRuntime(problem: Problem, emit: RuntimeEventHandler): Runt
     case 'react':
       return new ReactPreviewRuntime(emit);
     case 'web':
-      return new UnsupportedRuntime(problem.type, emit);
+      return new WebPreviewRuntime(emit);
   }
-}
-
-/** Placeholder so an unimplemented type degrades to a console message. */
-class UnsupportedRuntime implements Runtime {
-  private readonly type: string;
-  private readonly emit: RuntimeEventHandler;
-
-  constructor(type: string, emit: RuntimeEventHandler) {
-    this.type = type;
-    this.emit = emit;
-  }
-
-  run(): void {
-    this.emit({ type: 'start' });
-    this.emit({ type: 'error', message: `No runtime is registered for "${this.type}" problems yet.` });
-    this.emit({ type: 'complete', reason: 'error' });
-  }
-
-  dispose(): void {}
 }

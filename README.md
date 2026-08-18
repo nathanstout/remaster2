@@ -1,8 +1,8 @@
 # JS Practice
 
-A LeetCode-style playground for practical JavaScript and React problems.
-Prototype scope: **problem catalogue → editor → isolated execution → console
-(+ preview)**.
+A LeetCode-style playground for practical JavaScript, React and HTML/CSS/JS
+problems. Prototype scope: **problem catalogue → editor(s) → isolated execution
+→ console (+ preview)**.
 
 ```
 npm install
@@ -38,6 +38,7 @@ src/
   components/
     CodeEditor/       Monaco wrapper + local (non-CDN) Monaco setup
     Console/          console rendering, value formatting
+    FileTabs/         file switcher for multi-file problems
     ProblemList/      problem selector
     ProblemPanel/     problem statement
     ProblemWorkspace/ one problem: editor + runtime + console
@@ -53,17 +54,23 @@ src/
   runtime/
     createRuntime.ts              problem type -> runtime implementation
     shared/
-      serialize.ts                clone-safe value serialization (both runtimes)
+      serialize.ts                clone-safe value serialization (all runtimes)
+      preview/
+        IframePreviewHost.ts      iframe lifecycle shared by preview runtimes
+        bridge.ts                 console/error bridge + document scaffold + CSP
+        protocol.ts               typed iframe <-> host messages
     javascript/
       JavaScriptWorkerRuntime.ts  host side: worker lifecycle + timeouts
       javascript.worker.ts        sandbox: console, timers, error traps
       protocol.ts                 typed worker <-> host messages
     react/
-      ReactPreviewRuntime.ts      host side: iframe lifecycle + stale fencing
+      ReactPreviewRuntime.ts      composes the shared host
       compiler.ts                 esbuild-wasm singleton (TSX -> CJS)
-      previewDocument.ts          the generated sandbox document
+      previewDocument.ts          CJS registry + ReactDOM bootstrap
       reactRuntimeSources.ts      React/ReactDOM as inlined text
-      protocol.ts                 typed iframe <-> host messages
+    web/
+      WebPreviewRuntime.ts        composes the shared host
+      previewDocument.ts          HTML/CSS/JS -> full document
   types/
     problem.ts
     runtime.ts
@@ -88,6 +95,50 @@ headless Worker runtime is never asked for preview behaviour it does not have.
 | --- | --- | --- |
 | `javascript` | `JavaScriptWorkerRuntime` | disposable Web Worker |
 | `react` | `ReactPreviewRuntime` | disposable `sandbox="allow-scripts"` iframe |
+| `web` | `WebPreviewRuntime` | disposable `sandbox="allow-scripts"` iframe |
+
+Both preview runtimes compose `IframePreviewHost`, which owns run ids, mounting,
+message validation, the bootstrap watchdog and teardown. They differ only in how
+the document is built. Every preview carries a restrictive CSP
+(`default-src 'none'`, inline script/style only, `connect-src 'none'`), so user
+markup cannot reach the network.
+
+### Embedding user source
+
+User CSS and JavaScript never pass through the HTML parser. Both are handed to
+the document as JS string literals with `<` escaped as `\u003c`, then attached
+via `textContent`, so a literal `</script>` or `</style>` anywhere in ordinary
+source — including inside `String.raw` or a `/…/u` regex, which textual escaping
+would corrupt — is simply data. User *HTML* is inserted verbatim: it is markup,
+and browsers already recover from malformed markup.
+
+The console/error bridge is installed in `<head>`, ahead of the user's body
+markup, so a `<script>` the user writes inside their own HTML is captured too.
+Inline event handlers work (the CSP allows inline script) and their errors reach
+the console.
+
+`document.write` during parsing inserts, as in any page. After load it implies
+`document.open()`, which discards the document and every listener on the window.
+That is allowed, but the bridge re-arms its error traps afterwards and reports
+once that the document was replaced — otherwise error reporting would stop
+silently.
+
+### Console budget
+
+Each run may put `MAX_CONSOLE_ENTRIES` (500) messages on screen; the next one is
+replaced by a single truncation notice and the run keeps going. The host cap is
+authoritative and covers every runtime, and each execution context also stops
+posting just past the same mark so a runaway loop cannot saturate the message
+channel. Budgets are per run, so every edit starts fresh. Measured with a 100k
+message loop: host event-loop stalls stayed under ~110ms.
+
+### Web preview
+
+`index.html` is body markup only, CodePen-style; the runtime supplies the
+surrounding document. User JS runs at true top level in its own `<script>`, so
+`function greet() {}` becomes a global that inline `onclick` handlers can call.
+A separate trailing script reports startup, which is what keeps a *parse* error
+in user JS from degrading into a startup timeout.
 
 ### React preview
 
@@ -103,6 +154,16 @@ The runtime mounts the user's default export itself — problems never call
 `createRoot`. Console output and errors return over `postMessage`, serialized
 with the same module the Worker runtime uses, and are validated by source
 window, channel tag and run id before reaching the console.
+
+## Editing
+
+Workspace state is `Record<fileId, string>`, seeded from the problem definition
+and debounced as a whole; `RuntimeSource` is always assembled from every file,
+whichever one is being edited. Multi-file problems get a tab strip. Each file
+owns a Monaco model at `file:///<problemId>/<fileId>`, created on first visit, so
+undo history and diagnostics never cross a file or problem boundary. The editor
+disposes every model it created on unmount (`keepCurrentModel` hands disposal
+entirely to us), which is what stops models leaking across problem switches.
 
 ## Execution model
 

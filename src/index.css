@@ -163,11 +163,14 @@ body {
 }
 
 /* Shows through whenever the runtime has no live preview to display. The
-   iframe is opaque and covers it whenever there is one. */
+   iframe is opaque and covers it whenever there is one. `pointer-events: none`
+   is essential: without it this overlay silently swallows every click meant for
+   the preview. */
 .preview-host::before {
   content: 'No preview — see the console.';
   position: absolute;
   inset: 0;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -213,6 +216,36 @@ body {
   font-style: italic;
 }
 
+/* --------------------------------------------------------- file tabs */
+
+.file-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.file-tabs button {
+  padding: 6px 14px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.file-tabs button:hover {
+  color: var(--text);
+}
+
+.file-tabs button.selected {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
 .status {
   font-variant-numeric: tabular-nums;
 }
@@ -254,6 +287,11 @@ body {
 .level-error {
   background: rgba(224, 108, 117, 0.1);
   color: #e88b91;
+}
+
+.level-notice {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .console-stack {

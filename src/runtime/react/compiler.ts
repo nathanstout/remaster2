@@ -1,6 +1,5 @@
 import * as esbuild from 'esbuild-wasm';
 import wasmURL from 'esbuild-wasm/esbuild.wasm?url';
-import serializerSource from '../shared/serialize.ts?raw';
 
 /**
  * JSX/TSX compilation for preview runtimes.
@@ -27,6 +26,9 @@ export interface CompileResult {
 
 /** A compilation failure with esbuild's location-annotated message. */
 export class CompileError extends Error {
+  /** Read by the preview host: esbuild's text is already user-facing. */
+  readonly isUserFacing = true;
+
   constructor(message: string) {
     super(message);
     this.name = 'CompileError';
@@ -77,31 +79,4 @@ function formatCompileError(error: unknown, fileName: string): string {
       return `${message.text}${at}${snippet}`;
     })
     .join('\n');
-}
-
-/**
- * The console serializer, compiled for injection into a preview document.
- *
- * The preview needs the exact same value formatting as the Worker runtime, and
- * the only way to get code into an opaque-origin iframe is as text — so the
- * shared module's source is compiled to an IIFE once and reused for every run.
- */
-let serializerBundle: Promise<string> | null = null;
-
-export function getSerializerBundle(): Promise<string> {
-  serializerBundle ??= (async () => {
-    await ensureCompiler();
-    const result = await esbuild.transform(serializerSource, {
-      loader: 'ts',
-      format: 'iife',
-      globalName: '__previewSerializer',
-      target: 'es2020',
-      logLevel: 'silent',
-    });
-    return result.code;
-  })().catch((error: unknown) => {
-    serializerBundle = null;
-    throw error;
-  });
-  return serializerBundle;
 }
