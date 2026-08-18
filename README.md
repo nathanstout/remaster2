@@ -179,6 +179,39 @@ Tests get a tiny API: `assert.ok/equal/deepEqual/includes`, `sleep`, `waitFor`.
 Each case has its own timeout (2s default), and a hang fails only that case.
 Editing clears results and cancels any run in flight; so does switching problems.
 
+## Navigation
+
+Problem *content* and problem *organization* are separate. The catalogue owns
+what an exercise is; `src/taxonomy` owns where it appears — flat
+`ProblemFolder { id, name, parentId }` and `ProblemPlacement { problemId,
+folderId }` records, with nesting derived for rendering. Folder ids are identity
+and names are presentation, so Phase 7B can rename and move folders without
+touching problems, drafts, or URLs. The hand-written taxonomy is validated at
+startup (duplicate ids, unknown/self/cyclic parents, duplicate or dangling
+placements, unplaced problems) and throws in development rather than quietly
+rendering an incomplete tree.
+
+The taxonomy is user-editable and persisted at `practice-app:taxonomy`
+(`{ version, folders, placements }`). `defaultTaxonomy` stays immutable — it is
+the source-controlled fallback that tells reconciliation where a newly added
+problem belongs. On load the saved taxonomy is reconciled against the current
+catalogue: custom folders, names, parents and placements are preserved,
+placements for removed problems are dropped, and any problem the save predates
+is filed at its default location, recreating only the default folders that
+placement actually needs (with their original stable ids). A folder the user
+deleted stays deleted until something needs it.
+
+Organization edits live in `taxonomy/mutations.ts` as pure functions that build a
+candidate taxonomy and validate it before returning, so a rejected operation —
+a cycle, a non-empty delete, an empty name — leaves state untouched. The tree
+requests mutations; it never performs them.
+
+Routes are `/problem/:problemId`, keyed on stable problem ids only — never
+folder paths. The URL is the sole source of truth for what is selected: there is
+no parallel selection state, so reloads, deep links and browser Back/Forward all
+stay consistent, and the tree highlight and ancestor expansion follow from the
+route.
+
 ## Attempts
 
 An unfinished attempt is saved automatically to `localStorage` under
