@@ -75,6 +75,13 @@ assert.deepEqual(result, {
       source: `assert.deepEqual(flattenObject({ active: true, count: 2 }), { active: true, count: 2 });`,
     },
     {
+      id: 'drops-empty-nested-objects',
+      name: 'An empty nested object contributes no keys',
+      source: `assert.deepEqual(flattenObject({ a: {}, b: 1 }), { b: 1 });
+assert.deepEqual(flattenObject({ a: { b: {} } }), {});
+assert.deepEqual(flattenObject({}), {});`,
+    },
+    {
       id: 'treats-arrays-and-null-as-values',
       name: 'Treats arrays and null as leaf values',
       source: `const result = flattenObject({ tags: ['a', 'b'], meta: null, user: { id: 1 } });
@@ -127,13 +134,14 @@ const solution = {
 export const flattenObjectProblem: Problem = {
   id: 'flatten-object',
   version: 1,
-  title: 'Flatten a nested object',
+  title: 'Flatten a Nested Object',
   type: 'javascript',
   description: [
     'Implement `flattenObject(object)`, which turns a nested object into a flat one whose keys are dot-separated paths to each leaf value.',
     'For example `{ user: { name: "Nathan", address: { city: "Raleigh" } } }` becomes `{ "user.name": "Nathan", "user.address.city": "Raleigh" }`.',
     'Only plain nested objects should be descended into. Treat arrays, `null`, and primitives as leaf values and keep them as-is.',
-    'Decide for yourself what an empty nested object should do — the runner prints that case so you can see the effect of your choice.',
+    'An empty nested object contributes no keys at all: `{ a: {}, b: 1 }` flattens to `{ b: 1 }`. There is no leaf inside it to name.',
+    "**What you're practicing:** the same path-carrying recursion as the file-path exercise, over objects rather than nodes — plus deciding what actually counts as a branch worth descending into.",
   ].join('\n\n'),
   tests,
   hints,

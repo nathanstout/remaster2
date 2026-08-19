@@ -11,10 +11,26 @@ interface ProblemContextPanelProps {
   actions?: ReactNode;
 }
 
-/** Renders `inline code` spans; everything else is plain text. */
+/** Renders `inline code` and **bold** spans; everything else is plain text. */
+function renderEmphasis(text: string, keyPrefix: string) {
+  return text.split('**').map((chunk, index) =>
+    index % 2 === 1 ? (
+      <strong key={`${keyPrefix}-${index}`}>{chunk}</strong>
+    ) : (
+      <Fragment key={`${keyPrefix}-${index}`}>{chunk}</Fragment>
+    ),
+  );
+}
+
 function renderParagraph(text: string) {
+  // Code first: a backtick span is literal, so emphasis markers inside one are
+  // part of the code rather than formatting.
   return text.split('`').map((chunk, index) =>
-    index % 2 === 1 ? <code key={index}>{chunk}</code> : <Fragment key={index}>{chunk}</Fragment>,
+    index % 2 === 1 ? (
+      <code key={index}>{chunk}</code>
+    ) : (
+      <Fragment key={index}>{renderEmphasis(chunk, String(index))}</Fragment>
+    ),
   );
 }
 
