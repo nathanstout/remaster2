@@ -10,6 +10,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useRuntime, type EvaluationSummary } from '../../hooks/useRuntime';
 import { deleteAttempt, emptyProgress, loadAttempt, saveAttempt } from '../../persistence/attempts';
 
+import { useAttemptActivity } from '../../practice/attemptActivityContext';
 import { summarizeProblemPractice } from '../../practice/historyQueries';
 import { usePracticeHistory } from '../../practice/practiceHistoryContext';
 import { calculateMastery } from '../../practice/scoring';
@@ -84,6 +85,7 @@ export function ProblemWorkspace({
   const [recordError, setRecordError] = useState<string | null>(null);
 
   const { records, append } = usePracticeHistory();
+  const { report, clearReport } = useAttemptActivity();
   const now = useNow();
   // Derived on every render from stored records and the clock — never cached
   // next to the problem, so a new session updates it with no reload.
@@ -142,8 +144,23 @@ export function ProblemWorkspace({
     saveAttempt(problem, debouncedContents, progress);
   }, [problem, debouncedContents, progress, hasAttempt]);
 
+  // Published immediately, unlike the save above, which waits for typing to
+  // settle. Anything asking "would this destroy work?" — Skip, today — has to
+  // see the keystroke from a moment ago, not the last thing written to storage.
+  useEffect(() => {
+    report(problem.id, hasAttempt);
+    return () => clearReport(problem.id);
+  }, [problem.id, hasAttempt, report, clearReport]);
+
   const updateActiveFile = useCallback(
     (next: string) => {
+      // Reported here rather than waiting for the effect below, which cannot
+      // run until React has re-rendered. An edit and a click can land in the
+      // same tick, and Skip must not read "no work" from between them. It only
+      // ever escalates to "there is work": returning to the starter is left to
+      // the effect, which can see every source of activity at once.
+      if (next !== activeFile.starterCode) report(problem.id, true);
+
       setContents((previous) => {
         if (previous[activeFile.id] === next) return previous;
         // Results describe source that no longer exists, so they go — along
@@ -152,7 +169,7 @@ export function ProblemWorkspace({
         return { ...previous, [activeFile.id]: next };
       });
     },
-    [activeFile.id, clearEvaluation],
+    [activeFile.id, activeFile.starterCode, clearEvaluation, problem.id, report],
   );
 
   const revealHint = useCallback((hintId: string) => {

@@ -4,10 +4,15 @@ import { CompletionSummary } from './components/CompletionSummary/CompletionSumm
 import { FolderDetail } from './components/FolderDetail/FolderDetail';
 import { NavigationSidebar } from './components/NavigationSidebar/NavigationSidebar';
 import { ProblemWorkspace } from './components/ProblemWorkspace/ProblemWorkspace';
+import { SessionBar } from './components/SessionBar/SessionBar';
+import { SessionQueueDrawer } from './components/SessionBar/SessionQueueDrawer';
 import { useProblem } from './hooks/useProblem';
 import { DEFAULT_PROBLEM_ID, getProblem } from './problems';
 import { PracticeHistoryProvider } from './practice/PracticeHistoryProvider';
 import { PracticeInsightsProvider } from './practice/PracticeInsightsProvider';
+import { deleteAttempt } from './persistence/attempts';
+import { AttemptActivityProvider } from './practice/AttemptActivityProvider';
+import { PracticeSessionProvider } from './practiceSession';
 import { getFolder, TaxonomyProvider, useTaxonomy } from './taxonomy';
 import type { PracticeRecord } from './types/practice';
 
@@ -82,12 +87,32 @@ function FolderRoute() {
  */
 export default function App() {
   const [navCollapsed, setNavCollapsed] = useState(false);
+  // Presentation only, and owned here because the drawer and the bar that
+  // toggles it live in different parts of the shell. It changes no workspace
+  // key, so opening the queue re-renders but never remounts the workspace.
+  const [queueOpen, setQueueOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [lastRecord, setLastRecord] = useState<PracticeRecord | null>(null);
 
   const toggleNav = useCallback(() => setNavCollapsed((value) => !value), []);
+  const toggleQueue = useCallback(() => setQueueOpen((value) => !value), []);
   const handleAttemptEnded = useCallback((record?: PracticeRecord) => {
     setLastRecord(record ?? null);
+    setAttempt((value) => value + 1);
+  }, []);
+
+  /**
+   * Throws away the unfinished work on one problem.
+   *
+   * Skipping a problem from a session means exactly what Reset Attempt already
+   * means, so it reuses that path rather than introducing a second way to clear
+   * source: delete the stored attempt, then remount the workspace so it reseeds
+   * from the problem definition. Practice records are untouched — this only
+   * ever removes work that was never recorded.
+   */
+  const discardAttempt = useCallback((problemId: string) => {
+    deleteAttempt(problemId);
+    setLastRecord(null);
     setAttempt((value) => value + 1);
   }, []);
 
@@ -97,31 +122,44 @@ export default function App() {
     <TaxonomyProvider>
       <PracticeHistoryProvider>
         <PracticeInsightsProvider>
-          <div className="app-shell">
-            {lastRecord && (
-              <CompletionSummary
-                record={lastRecord}
-                totalHints={summaryProblem?.hints?.length ?? 0}
-                onDismiss={() => setLastRecord(null)}
-              />
-            )}
+          <AttemptActivityProvider>
+            <PracticeSessionProvider onDiscardAttempt={discardAttempt}>
+              <div className="app-shell">
+                {lastRecord && (
+                  <CompletionSummary
+                    record={lastRecord}
+                    totalHints={summaryProblem?.hints?.length ?? 0}
+                    onDismiss={() => setLastRecord(null)}
+                  />
+                )}
 
-            <div className="app">
-              <NavigationSidebar collapsed={navCollapsed} onToggle={toggleNav} />
+                <div className="app">
+                  <NavigationSidebar collapsed={navCollapsed} onToggle={toggleNav} />
 
-              <Routes>
-                <Route
-                  path="/problem/:problemId"
-                  element={
-                    <ProblemRoute attempt={attempt} onAttemptEnded={handleAttemptEnded} />
-                  }
-                />
-                <Route path="/folder/:folderId" element={<FolderRoute />} />
-                {/* `/` and anything unrecognised land on a known-good problem. */}
-                <Route path="*" element={<Navigate to={DEFAULT_ROUTE} replace />} />
-              </Routes>
-            </div>
-          </div>
+                  <Routes>
+                    <Route
+                      path="/problem/:problemId"
+                      element={<ProblemRoute attempt={attempt} onAttemptEnded={handleAttemptEnded} />}
+                    />
+                    <Route path="/folder/:folderId" element={<FolderRoute />} />
+                    {/* `/` and anything unrecognised land on a known-good problem. */}
+                    <Route path="*" element={<Navigate to={DEFAULT_ROUTE} replace />} />
+                  </Routes>
+
+                  {/* A column in the application row rather than an overlay, so the
+                      queue takes width from the workspace instead of sitting on top
+                      of the console and preview controls. */}
+                  {queueOpen && <SessionQueueDrawer onClose={() => setQueueOpen(false)} />}
+                </div>
+
+                {/* A sibling of the application row, not an overlay: it reserves its
+                    own height in the shell column, so it cannot cover the editor or
+                    the output controls. Mounted once, outside the routes, so session
+                    changes never remount the workspace. */}
+                <SessionBar queueOpen={queueOpen} onToggleQueue={toggleQueue} />
+              </div>
+            </PracticeSessionProvider>
+          </AttemptActivityProvider>
         </PracticeInsightsProvider>
       </PracticeHistoryProvider>
     </TaxonomyProvider>

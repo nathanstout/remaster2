@@ -1183,3 +1183,463 @@ body {
   .nav-sidebar { flex-basis: 220px; }
   .problem-context { flex-basis: 280px; }
 }
+
+/* ---------------------------------------------------- practice session bar */
+
+/* A row in the shell's flex column, never an overlay: it takes its own height
+   out of the application area, so the editor, preview and output controls are
+   laid out inside what is left rather than underneath it. */
+.session-bar {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  font-size: 13px;
+}
+
+/* Two logical rows at comfortable widths, collapsing to three when there is not
+   enough room — controls wrap rather than overlapping or being cut off. */
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px 20px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+}
+
+.session-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.session-identity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Mode is spelled out rather than shown as an icon: "In Order" and "Shuffle"
+   are the difference between two sessions that otherwise look identical. */
+.session-mode {
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.session-mode.mode-ordered {
+  border-color: #3f5a86;
+  color: var(--accent);
+}
+
+.session-mode.mode-shuffle {
+  border-color: #6b5a86;
+  color: #c8a2f7;
+}
+
+.session-folder {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-dot,
+.session-progress {
+  color: var(--muted);
+}
+
+.session-progress {
+  white-space: nowrap;
+}
+
+/* The current problem is the one thing on the bar worth reading at a glance,
+   so it takes the free space and the strongest weight. */
+.session-headline {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+}
+
+.session-label {
+  flex: 0 0 auto;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.session-current-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.session-headline.complete {
+  color: var(--text);
+}
+
+.session-aside {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.session-health {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.session-health.new {
+  color: var(--muted);
+}
+
+/* Grouped by consequence: what happens to this problem, then what happens to
+   the session. */
+.session-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.session-action-group {
+  display: flex;
+  gap: 8px;
+}
+
+.session-bar button {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.session-bar button:hover:not(:disabled) {
+  border-color: #3d4450;
+  background: #23262e;
+}
+
+.session-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.session-bar button.submit {
+  border-color: var(--accent);
+  background: #2f3b52;
+}
+
+.session-bar button.danger {
+  border-color: #7a4a4a;
+  color: #e8a0a0;
+}
+
+/* Session trouble is reported on the session surface only — never mixed into
+   test results, the console, or the mastery summary. */
+.session-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border);
+  background: #23262e;
+  color: var(--muted);
+}
+
+.session-notice span {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.session-notice.recovery {
+  background: rgba(229, 192, 123, 0.12);
+}
+
+.session-notice.recovery strong {
+  color: #e5c07b;
+}
+
+/* -------------------------------------------------- practice queue drawer */
+
+/* A column of the application row, so it takes width from the workspace rather
+   than covering the console and preview controls. */
+.queue-drawer {
+  flex: 0 0 380px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+}
+
+@media (max-width: 1400px) {
+  .queue-drawer {
+    flex-basis: 320px;
+  }
+}
+
+.queue-drawer-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.queue-drawer-header h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.queue-drawer-source {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 13px;
+}
+
+.queue-drawer-progress {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.queue-drawer-header > button {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.queue-drawer-header > button:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* The queue's own scroll region: a fifty-item session cannot grow the page or
+   push the session bar out of view. */
+.queue-drawer-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.queue-section h3 {
+  position: sticky;
+  top: 0;
+  margin: 0;
+  padding: 10px 16px 4px;
+  background: var(--panel);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.queue-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 16px;
+  font-size: 13px;
+}
+
+.queue-mark {
+  flex: 0 0 12px;
+  color: var(--muted);
+}
+
+/* Current is marked by weight, a border and a label — not by colour alone. */
+.queue-row.current {
+  border-left: 2px solid var(--accent);
+  padding-left: 14px;
+  background: rgba(122, 162, 247, 0.1);
+  font-weight: 600;
+}
+
+.queue-row.current .queue-mark {
+  color: var(--accent);
+}
+
+.queue-row.completed .queue-title,
+.queue-row.completed .queue-mark {
+  color: var(--muted);
+}
+
+.queue-row.skipped .queue-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.queue-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Long titles wrap instead of pushing health off the row. */
+  overflow-wrap: anywhere;
+}
+
+button.queue-title.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.queue-title.link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.queue-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.queue-health {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* --------------------------------------------------- start a session */
+
+.start-session {
+  margin-bottom: 24px;
+}
+
+.start-session h2 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.session-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Two cards side by side: the modes queue the same problems, so the difference
+   worth showing is the reason to pick one. */
+.session-modes {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.session-mode-card {
+  flex: 1 1 260px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.session-mode-card h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.session-mode-card p {
+  margin: 0;
+  flex: 1 1 auto;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.start-session button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.start-session button:hover {
+  border-color: #3d4450;
+  background: #23262e;
+}
+
+.start-session button.submit {
+  border-color: var(--accent);
+  background: #2f3b52;
+}
+
+.session-confirm {
+  max-width: 60ch;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.session-confirm p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.session-confirm strong {
+  color: var(--text);
+}
+
+.session-confirm-actions {
+  display: flex;
+  gap: 8px;
+}

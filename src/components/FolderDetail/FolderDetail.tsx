@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { getProblem } from '../../problems';
 import { usePracticeInsights } from '../../practice/practiceInsightsContext';
+import { collectSubtreeEntries } from '../../practiceSession';
 import { getAncestorFolders, useTaxonomy, type ProblemFolder } from '../../taxonomy';
 import { formatRelativeDay } from '../../utils/relativeTime';
 import { BAND_WORD } from '../ProblemTree/HealthRail';
+import { StartSessionControls } from './StartSessionControls';
 
 /**
  * What a folder contains, how well it is retained, and what to look at next.
@@ -19,6 +21,9 @@ export function FolderDetail({ folder }: { folder: ProblemFolder }) {
   const candidates = reviewCandidates(folder.id);
   const unpracticed = unpracticedProblems(folder.id);
   const ancestors = getAncestorFolders(taxonomy, folder.id);
+  // The same walk the session itself would snapshot, so the count shown is
+  // exactly what starting a session here would queue up.
+  const subtreeProblems = collectSubtreeEntries(taxonomy, folder.id);
 
   return (
     <div className="folder-detail">
@@ -35,6 +40,8 @@ export function FolderDetail({ folder }: { folder: ProblemFolder }) {
       </header>
 
       <div className="folder-body">
+        <StartSessionControls folderId={folder.id} problemCount={subtreeProblems.length} />
+
         <section className="folder-metrics">
           {summary.status === 'empty' && <p className="practice-empty">This folder has no problems.</p>}
 
